@@ -1,0 +1,16 @@
+{
+  "name": "mindattic-catalog",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Single-source generator and FTPS deployer for every mindattic.com/<project>/ landing page.",
+  "scripts": {
+    "build": "node src/build.js",
+    "deploy": "node src/deploy.js",
+    "all": "node src/deploy.js"
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.5",
+    "highlight.js": "^11.9.0",
+    "marked": "^4.3.0"
+  }
+}

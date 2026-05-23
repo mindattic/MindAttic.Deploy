@@ -1,0 +1,101 @@
+{
+  "$comment": "Canonical registry of every README-driven landing page at mindattic.com/<slug>.htm. Edit ONLY this file to add, remove, or retag a project. Build = node src/build.js. Deploy = node src/deploy.js. componentsVersion pins the jsDelivr tag for MindAttic.UIUX (Components and Themes both come from this ref); use 'main' for tip-of-tree, or 'v1.0.0' style tags for immutable cache hits in production. Each project picks a theme via the 'theme' field; valid values match folder names under MindAttic.UIUX/Themes/ (currently: Cyberspace, Hardware).",
+
+  "componentsVersion": "main",
+
+  "ftpRemoteRoot": "/mindattic.com",
+
+  "projects": [
+    {
+      "slug":    "idiotproof",
+      "repo":    "IdiotProof",
+      "title":   "IdiotProof",
+      "tagline": "Branching trading strategies, evaluated 24/7.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "fractionsofacent",
+      "repo":    "FractionsOfACent",
+      "title":   "FractionsOfACent",
+      "tagline": "Scans public GitHub for leaked API keys, DB connection strings, private keys, and JWTs.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "gridgame2026",
+      "repo":    "GridGame2026",
+      "title":   "GridGame2026",
+      "tagline": "Unity 6000.3 tactical grid RPG, 2D sprites on a 3D board.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "mindatticlegion",
+      "repo":    "MindAttic.Legion",
+      "title":   "MindAttic.Legion",
+      "tagline": ".NET 10 library and CLI for multi-LLM consensus across 11 providers.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "mindatticmobile",
+      "repo":    "MindAttic.Mobile",
+      "title":   "MindAttic.Mobile",
+      "tagline": "Self-hosted bridge exposing ConPTY-wrapped CLI sessions to any browser on your tailnet.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "mindatticpsst",
+      "repo":    "MindAttic.Psst",
+      "title":   "MindAttic.Psst",
+      "tagline": "Stop babysitting your terminal. Psst taps you on the shoulder the moment a long-running command finishes — a sound at your desk, a text on your phone.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "mindatticvault",
+      "repo":    "MindAttic.Vault",
+      "title":   "MindAttic.Vault",
+      "tagline": ".NET 9/10 library for credentials and per-app settings.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "taxratecollector",
+      "repo":    "TaxRateCollector",
+      "title":   "TaxRateCollector",
+      "tagline": "Blazor Server app maintaining a US sales tax rate database for 14,000+ jurisdictions.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "thinktank",
+      "repo":    "ThinkTank",
+      "title":   "ThinkTank",
+      "tagline": ".NET 10 MAUI + Blazor desktop app for multi-LLM conversations across 11 providers.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "tutor",
+      "repo":    "Tutor",
+      "title":   "Tutor",
+      "tagline": "Blazor Server app converting books and documents into structured courses via multi-LLM pipeline.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "mediabutler",
+      "repo":    "MediaButler",
+      "title":   "MediaButler",
+      "tagline": "Automated media renamer and reorganizer. FileBot + Plex-ready library layout, for people whose media folder looks like a crime scene.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "claudia",
+      "repo":    "Claudia",
+      "title":   "Claudia",
+      "tagline": "Build your own Claude-powered smart speaker in an afternoon. No soldering. No cloud lock-in.",
+      "theme":   "Hardware"
+    },
+    {
+      "slug":    "chimesh",
+      "repo":    "ChiMesh",
+      "title":   "ChiMesh",
+      "tagline": "Off-grid Chicago. A solar-powered LoRa mesh that runs without the internet, the grid, or anyone's permission.",
+      "theme":   "Hardware"
+    }
+  ]
+}

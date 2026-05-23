@@ -1,0 +1,40 @@
+name: Build and deploy landing pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'projects.json'
+      - 'template/**'
+      - 'src/**'
+      - 'package.json'
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Single project slug to deploy (leave blank for all)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Deploy
+        env:
+          MINDATTIC_FTP_JSON:      ${{ secrets.MINDATTIC_FTP_JSON }}
+          SUBSCRIBER_REPO_TOKEN:   ${{ secrets.SUBSCRIBER_REPO_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.only }}" ]; then
+            npm run deploy -- --from-github --only "${{ inputs.only }}"
+          else
+            npm run deploy -- --from-github
+          fi
