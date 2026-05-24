@@ -20,6 +20,10 @@ public sealed class AppCommand : Command<AppCommand.Settings>
         [Description("Run preDeploy hooks; report planned commit/push without executing.")]
         public bool DryRun { get; set; }
 
+        [CommandOption("--include-disabled")]
+        [Description("With --all, also surface notes for `disabled: true` apps (otherwise skipped).")]
+        public bool IncludeDisabled { get; set; }
+
         public override Spectre.Console.ValidationResult Validate()
         {
             if (string.IsNullOrWhiteSpace(Slug) && !All)
@@ -32,6 +36,6 @@ public sealed class AppCommand : Command<AppCommand.Settings>
     {
         var roster = ProjectRoster.Load();
         var runner = new DeployRunner(roster.RepoRoot);
-        return runner.RunApp(settings.Slug, settings.All, settings.DryRun);
+        return runner.RunApp(settings.Slug, settings.All, settings.DryRun, settings.IncludeDisabled);
     }
 }

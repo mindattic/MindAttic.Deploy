@@ -31,6 +31,9 @@ app.Configure(config =>
         .WithExample("app", "--slug", "streetsamurai", "--dry-run")
         .WithExample("app", "--all");
 
+    config.AddCommand<ListCommand>("list")
+        .WithDescription("Print every deploy target (catalog, sites, apps) with slugs + status.");
+
     config.AddCommand<VersionCommand>("version")
         .WithAlias("--version")
         .WithDescription("Print version and exe path.");

@@ -9,30 +9,41 @@ public sealed class DeployRunner
     private readonly string _repoRoot;
     public DeployRunner(string repoRoot) => _repoRoot = repoRoot;
 
-    public int RunCatalog(string? onlySlug, bool skipBuild)
+    public int RunCatalog(IEnumerable<string>? onlySlugs, bool skipBuild, bool dryRun)
     {
         var args = new List<string> { "src/deploy.js" };
-        if (!string.IsNullOrWhiteSpace(onlySlug)) { args.Add("--only"); args.Add(onlySlug); }
+        if (onlySlugs != null)
+        {
+            foreach (var slug in onlySlugs)
+            {
+                if (string.IsNullOrWhiteSpace(slug)) continue;
+                args.Add("--only");
+                args.Add(slug);
+            }
+        }
         if (skipBuild) args.Add("--skip-build");
+        if (dryRun) args.Add("--dry-run");
         return RunNode(args);
     }
 
-    public int RunSite(string? slug, bool all)
+    public int RunSite(string? slug, bool all, bool dryRun)
     {
         var args = new List<string> { "src/deploy.js" };
         if (all) args.Add("--sites");
         else if (!string.IsNullOrWhiteSpace(slug)) { args.Add("--site"); args.Add(slug); }
         else throw new ArgumentException("RunSite requires either --slug or --all.");
+        if (dryRun) args.Add("--dry-run");
         return RunNode(args);
     }
 
-    public int RunApp(string? slug, bool all, bool dryRun)
+    public int RunApp(string? slug, bool all, bool dryRun, bool includeDisabled)
     {
         var args = new List<string> { "src/deploy.js" };
         if (all) args.Add("--apps");
         else if (!string.IsNullOrWhiteSpace(slug)) { args.Add("--app"); args.Add(slug); }
         else throw new ArgumentException("RunApp requires either --slug or --all.");
         if (dryRun) args.Add("--dry-run");
+        if (includeDisabled) args.Add("--include-disabled");
         return RunNode(args);
     }
 

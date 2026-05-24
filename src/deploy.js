@@ -26,7 +26,7 @@
  *   --app <slug>           : app mode     -- deploy a single Blazor app (via GitHub Actions)
  *   --apps                 : app mode     -- deploy every ENABLED app (use --include-disabled to surface stubs)
  *   --include-disabled     : app mode     -- include `disabled: true` apps in --apps iteration
- *   --dry-run              : app mode     -- run preDeploy hooks + report the planned commit/push without executing them
+ *   --dry-run              : any mode     -- preview without firing: app skips commit/push; site skips stamp+FTP; catalog still builds but skips FTP
  *   --skip-build           : catalog mode -- skip the implicit build step
  *
  * Credentials live in secrets/ftp.json (or MINDATTIC_FTP_JSON env in CI).
@@ -215,9 +215,22 @@ async function deployOneSite(client, site) {
         throw new Error(`sourceDir not found for site '${site.slug}': ${sourceDir}`);
     }
 
-    process.stdout.write(`\nSite: ${site.slug}  (${sourceDir} -> ${site.ftpRemotePath})\n`);
+    process.stdout.write(`\nSite: ${site.slug}  (${sourceDir} -> ${site.ftpRemotePath})${dryRun ? '  [DRY-RUN]' : ''}\n`);
 
     await executePreDeploy(site);
+
+    const rawRemote = site.ftpRemotePath || '/';
+    const remoteDir = rawRemote === '/' ? '/' : rawRemote.replace(/\/$/, '');
+    const files = expandFiles(sourceDir, site.files || ['index.htm']);
+
+    if (dryRun) {
+        if (site.stampFile) process.stdout.write(`  [stamp] (dry-run) would stamp ${site.stampFile}\n`);
+        for (const f of files) {
+            const remoteShown = remoteDir === '/' ? `/${f}` : `${remoteDir}/${f}`;
+            process.stdout.write(`  [ftp]   (dry-run) would upload ${f.padEnd(24)} -> ${remoteShown}\n`);
+        }
+        return { uploaded: 0, failed: 0 };
+    }
 
     if (site.stampFile) {
         const stampPath = path.join(sourceDir, site.stampFile);
@@ -229,14 +242,11 @@ async function deployOneSite(client, site) {
         }
     }
 
-    const files = expandFiles(sourceDir, site.files || ['index.htm']);
     if (files.length === 0) {
         process.stdout.write(`  [warn] no files matched ${JSON.stringify(site.files)} in ${sourceDir}\n`);
         return { uploaded: 0, failed: 0 };
     }
 
-    const rawRemote = site.ftpRemotePath || '/';
-    const remoteDir = rawRemote === '/' ? '/' : rawRemote.replace(/\/$/, '');
     await client.ensureDir(remoteDir);
 
     let uploaded = 0, failed = 0;
@@ -390,23 +400,25 @@ async function runSiteMode(config) {
         }
     }
 
-    const ftpCfg = loadFtpSettings();
+    const ftpCfg = dryRun ? null : loadFtpSettings();
     const client = new ftp.Client(60_000);
     client.ftp.verbose = false;
 
-    process.stdout.write(`\nDeploying ${targets.length} site(s) via ftp://${ftpCfg.host}:${ftpCfg.port || 21}/\n`);
+    process.stdout.write(`\nDeploying ${targets.length} site(s)${dryRun ? '  [DRY-RUN -- no FTP connect, no uploads]' : ` via ftp://${ftpCfg.host}:${ftpCfg.port || 21}/`}\n`);
 
     let totalUploaded = 0, totalFailed = 0;
     const siteErrors = [];
     try {
-        await client.access({
-            host:     ftpCfg.host,
-            port:     ftpCfg.port || 21,
-            user:     ftpCfg.user,
-            password: ftpCfg.password,
-            secure:   ftpCfg.secure !== false,
-            secureOptions: { rejectUnauthorized: false },
-        });
+        if (!dryRun) {
+            await client.access({
+                host:     ftpCfg.host,
+                port:     ftpCfg.port || 21,
+                user:     ftpCfg.user,
+                password: ftpCfg.password,
+                secure:   ftpCfg.secure !== false,
+                secureOptions: { rejectUnauthorized: false },
+            });
+        }
         for (const site of targets) {
             try {
                 const r = await deployOneSite(client, site);
@@ -440,6 +452,20 @@ async function runCatalogMode(config) {
     }
 
     if (!skipBuild) await runBuild();
+
+    if (dryRun) {
+        process.stdout.write(`\nDeploying ${projects.length} landing page(s)  [DRY-RUN -- no FTP connect, no uploads]\n`);
+        const remoteRoot = ftpRemoteRoot.replace(/\/$/, '');
+        for (const project of projects) {
+            const localFile = path.join(outRoot, `${project.slug}.htm`);
+            const exists = fs.existsSync(localFile);
+            const size = exists ? fs.statSync(localFile).size : 0;
+            const label = exists ? `${String(size).padStart(7)} bytes` : `[missing build artifact]`;
+            process.stdout.write(`  [ftp]  (dry-run) would upload ${project.slug.padEnd(18)} ${label} -> ${remoteRoot}/${project.slug}.htm\n`);
+        }
+        process.stdout.write(`\nDone. ${projects.length} would deploy.\n`);
+        return;
+    }
 
     const ftpCfg = loadFtpSettings();
     const client = new ftp.Client(60_000);

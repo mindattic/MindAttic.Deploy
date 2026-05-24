@@ -50,25 +50,65 @@ public sealed class MainMenuCommand : Command
             return 0;
         }
 
+        var catalogPicks = picks.Where(p => p.StartsWith(CatalogPrefix)).Select(p => p[CatalogPrefix.Length..]).ToList();
+        var sitePicks    = picks.Where(p => p.StartsWith(SitePrefix))   .Select(p => p[SitePrefix.Length..])   .ToList();
+        var appPicks     = picks.Where(p => p.StartsWith(AppPrefix))    .Select(p => p[AppPrefix.Length..])    .ToList();
+
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[bold]Deploying {picks.Count} target(s)...[/]");
+        AnsiConsole.MarkupLine($"[bold]Deploying {picks.Count} target(s) in {Batches(catalogPicks, sitePicks, appPicks, roster.Config)} batch(es)...[/]");
 
         int failed = 0;
-        foreach (var pick in picks)
+
+        if (catalogPicks.Count > 0)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule($"[cyan]{pick}[/]").LeftJustified());
-            int code = pick switch
+            AnsiConsole.Write(new Rule($"[cyan]catalog: {string.Join(", ", catalogPicks)}[/]").LeftJustified());
+            // One node invocation builds all selected slugs once, then uploads each.
+            int code = runner.RunCatalog(catalogPicks, skipBuild: false, dryRun: false);
+            if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
+        }
+
+        if (sitePicks.Count > 0)
+        {
+            if (sitePicks.Count == roster.Config.Sites.Count)
             {
-                _ when pick.StartsWith(CatalogPrefix) => runner.RunCatalog(pick[CatalogPrefix.Length..], skipBuild: false),
-                _ when pick.StartsWith(SitePrefix)    => runner.RunSite(pick[SitePrefix.Length..], all: false),
-                _ when pick.StartsWith(AppPrefix)     => runner.RunApp(pick[AppPrefix.Length..], all: false, dryRun: false),
-                _ => 1,
-            };
-            if (code != 0)
+                AnsiConsole.WriteLine();
+                AnsiConsole.Write(new Rule("[cyan]sites: --all[/]").LeftJustified());
+                int code = runner.RunSite(slug: null, all: true, dryRun: false);
+                if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
+            }
+            else
             {
-                failed++;
-                AnsiConsole.MarkupLine($"[red]Exit {code}[/]");
+                foreach (var slug in sitePicks)
+                {
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.Write(new Rule($"[cyan]site: {slug}[/]").LeftJustified());
+                    int code = runner.RunSite(slug, all: false, dryRun: false);
+                    if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
+                }
+            }
+        }
+
+        if (appPicks.Count > 0)
+        {
+            var enabledCount = roster.Config.Apps.Count(a => !a.Disabled);
+            var allEnabledPicked = enabledCount > 0 && appPicks.Count == roster.Config.Apps.Count;
+            if (allEnabledPicked)
+            {
+                AnsiConsole.WriteLine();
+                AnsiConsole.Write(new Rule("[cyan]apps: --all[/]").LeftJustified());
+                int code = runner.RunApp(slug: null, all: true, dryRun: false, includeDisabled: true);
+                if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
+            }
+            else
+            {
+                foreach (var slug in appPicks)
+                {
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.Write(new Rule($"[cyan]app: {slug}[/]").LeftJustified());
+                    int code = runner.RunApp(slug, all: false, dryRun: false, includeDisabled: false);
+                    if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
+                }
             }
         }
 
@@ -76,11 +116,20 @@ public sealed class MainMenuCommand : Command
         AnsiConsole.Write(new Rule().LeftJustified());
         if (failed > 0)
         {
-            AnsiConsole.MarkupLine($"[red]{failed}/{picks.Count} target(s) failed.[/]");
+            AnsiConsole.MarkupLine($"[red]{failed} batch(es) failed.[/]");
             return 1;
         }
         AnsiConsole.MarkupLine($"[green]All {picks.Count} target(s) deployed.[/]");
         return 0;
+    }
+
+    private static int Batches(List<string> catalog, List<string> sites, List<string> apps, DeployConfig cfg)
+    {
+        int n = 0;
+        if (catalog.Count > 0) n += 1;
+        if (sites.Count > 0)   n += sites.Count == cfg.Sites.Count ? 1 : sites.Count;
+        if (apps.Count > 0)    n += apps.Count == cfg.Apps.Count ? 1 : apps.Count;
+        return n;
     }
 
     private static Func<string, string> LabelFor(DeployConfig cfg) => key =>

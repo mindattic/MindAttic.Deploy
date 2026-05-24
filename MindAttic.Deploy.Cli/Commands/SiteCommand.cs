@@ -16,6 +16,10 @@ public sealed class SiteCommand : Command<SiteCommand.Settings>
         [Description("Deploy every root site.")]
         public bool All { get; set; }
 
+        [CommandOption("--dry-run")]
+        [Description("Run preDeploy hooks but skip the stamp + FTP upload; preview what would deploy.")]
+        public bool DryRun { get; set; }
+
         public override Spectre.Console.ValidationResult Validate()
         {
             if (string.IsNullOrWhiteSpace(Slug) && !All)
@@ -28,6 +32,6 @@ public sealed class SiteCommand : Command<SiteCommand.Settings>
     {
         var roster = ProjectRoster.Load();
         var runner = new DeployRunner(roster.RepoRoot);
-        return runner.RunSite(settings.Slug, settings.All);
+        return runner.RunSite(settings.Slug, settings.All, settings.DryRun);
     }
 }
