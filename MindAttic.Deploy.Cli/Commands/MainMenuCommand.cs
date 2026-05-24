@@ -91,9 +91,11 @@ public sealed class MainMenuCommand : Command
 
         if (appPicks.Count > 0)
         {
-            var enabledCount = roster.Config.Apps.Count(a => !a.Disabled);
-            var allEnabledPicked = enabledCount > 0 && appPicks.Count == roster.Config.Apps.Count;
-            if (allEnabledPicked)
+            // Every app in the prompt was picked (including disabled ones — the prompt
+            // lists them all). Collapse to `--apps --include-disabled` so the user sees
+            // each disabled note exactly once instead of N times in a single-app loop.
+            var allAppsPicked = appPicks.Count == roster.Config.Apps.Count;
+            if (allAppsPicked)
             {
                 AnsiConsole.WriteLine();
                 AnsiConsole.Write(new Rule("[cyan]apps: --all[/]").LeftJustified());

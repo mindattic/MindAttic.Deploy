@@ -8,3 +8,4 @@ secrets/ftp.json
 **/obj/
 *.user
 .vs/
+artifacts/

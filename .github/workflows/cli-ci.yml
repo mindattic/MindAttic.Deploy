@@ -1,0 +1,35 @@
+name: CLI build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'MindAttic.Deploy.Cli/**'
+      - 'global.json'
+      - 'Directory.Build.props'
+      - '.github/workflows/cli-ci.yml'
+  pull_request:
+    paths:
+      - 'MindAttic.Deploy.Cli/**'
+      - 'global.json'
+      - 'Directory.Build.props'
+      - '.github/workflows/cli-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build MindAttic.Deploy.Cli/MindAttic.Deploy.Cli.csproj -c Release --nologo
+
+      # Smoke test: --version short-circuits before touching projects.json or
+      # the node pipeline, so it's safe to run without secrets / siblings.
+      - name: Smoke test (--version)
+        run: dotnet MindAttic.Deploy.Cli/bin/Release/net10.0/MindAttic.Deploy.dll --version

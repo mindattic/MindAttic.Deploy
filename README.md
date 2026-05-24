@@ -43,9 +43,9 @@ Anything that ships via FTP. Today that's:
 Per-project `/deploy` slash commands shell into this repo:
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\Projects\MindAttic\MindAttic.Deploy\bin\deploy.ps1" --only <slug>
+cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --only <slug>
 # or for Blazor apps:
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\Projects\MindAttic\MindAttic.Deploy\bin\deploy.ps1" --app  <slug>
+cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --app  <slug>
 ```
 
 That's the entire pipeline. There is no per-project deploy state.
@@ -112,7 +112,7 @@ Lookup order in `deploy.js`: `MINDATTIC_FTP_JSON` env -> APPDATA Vault file -> l
 | One `deploy.settings.json` per project, each with the same FTP credentials | one Vault entry at `%APPDATA%\MindAttic\Deploy\ftp.json` |
 | 11 `index.htm` files in 11 repos with marker blocks            | rendered artifacts in `out/`     |
 | `sync-landing-page.ps1` + `sync-claudia.ps1` + `sync-chimesh.ps1` + 13 entries in `MindAttic.UiUx/subscribers.json` | zero sync scripts, zero splice for landing pages — MindAttic.UiUx now only owns the three splice subscribers it still needs (mindattic.com, StreetSamurai, MindAttic.Psst legal pages) |
-| Per-project `.claude/commands/deploy.md` doing real work       | per-project shim -> `MindAttic.Deploy/bin/deploy.ps1 --only <slug>` (catalog) or `--app <slug>` (Blazor) |
+| Per-project `.claude/commands/deploy.md` doing real work       | per-project shim -> `npm run deploy -- --only <slug>` (catalog) or `--app <slug>` (Blazor) |
 
 Components and themes are loaded via CDN (`jsDelivr`) at runtime instead of being inlined per subscriber. Editing a font or the Cyberspace engine no longer requires a 13-target sync — push to MindAttic.UiUx, bump `componentsVersion` here if you want to pin, redeploy.
 
@@ -130,7 +130,6 @@ See `CLAUDE.md` for the in-flight migration plan.
 - [x] Delete orphaned local deploy files (`scripts/cli/deploy.*`, `deploy.settings.json*`, root-site `deploy.{bat,ps1}` + `settings.json`) across every MindAttic project; update Vault settings.json `runCommand` entries (the 3 root sites no longer prefix `deploy.bat &&`). Per-repo `git rm` + commit; user pushes.
 - [x] `MindAttic.Deploy.Cli` (C# console app modelled on MindAttic.Console). Spectre.Console.Cli, `net10.0`. Commands: `catalog`, `site`, `app`, `version`. Default (no args) is an interactive multi-select prompt grouping catalog + sites + apps. Shells into the canonical `node src/deploy.js` pipeline.
 - [x] Retire deprecated `landing-page` and `build-html-js` paths in `MindAttic.UiUx/subscribers.json` (and the three sync scripts they used). MindAttic.UiUx now only owns the three splice subscribers that genuinely need build-time inlining.
-- [ ] Add `bin/deploy.ps1` wrapper (currently every shim calls `node src/deploy.js` directly).
 - [ ] Move FTP credentials to `%APPDATA%\MindAttic\Deploy\ftp.json` via MindAttic.Vault; retire `secrets/ftp.json`.
 
 `StreetSamurai` stays Azure-CI-deployed; this repo just owns the slash-command shim and the pre-deploy UiUx sync. `MindAttic.UiUx` keeps its three splice scripts (`sync-mindattic-com.ps1`, `sync-streetsamurai.ps1`, `sync-mindattic-psst.ps1`); two of them run as `preDeploy` hooks from this repo.

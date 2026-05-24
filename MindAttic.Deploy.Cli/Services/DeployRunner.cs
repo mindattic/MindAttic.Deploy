@@ -9,7 +9,10 @@ public sealed class DeployRunner
     private readonly string _repoRoot;
     public DeployRunner(string repoRoot) => _repoRoot = repoRoot;
 
-    public int RunCatalog(IEnumerable<string>? onlySlugs, bool skipBuild, bool dryRun)
+    public int RunCatalog(
+        IEnumerable<string>? onlySlugs, bool skipBuild, bool dryRun,
+        bool fromGithub = false, string? gitRef = null,
+        string? siblingsRoot = null, string? themesRoot = null, string? components = null)
     {
         var args = new List<string> { "src/deploy.js" };
         if (onlySlugs != null)
@@ -23,6 +26,11 @@ public sealed class DeployRunner
         }
         if (skipBuild) args.Add("--skip-build");
         if (dryRun) args.Add("--dry-run");
+        if (fromGithub) args.Add("--from-github");
+        if (!string.IsNullOrWhiteSpace(gitRef))      { args.Add("--ref");            args.Add(gitRef); }
+        if (!string.IsNullOrWhiteSpace(siblingsRoot)) { args.Add("--siblings-root"); args.Add(siblingsRoot); }
+        if (!string.IsNullOrWhiteSpace(themesRoot))   { args.Add("--themes-root");   args.Add(themesRoot); }
+        if (!string.IsNullOrWhiteSpace(components))   { args.Add("--components");    args.Add(components); }
         return RunNode(args);
     }
 

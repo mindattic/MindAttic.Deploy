@@ -20,21 +20,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: MindAttic.Deploy
+
+      # Themes (Cyberspace/Hardware CSS + body preludes + deps.json) live in
+      # MindAttic.UiUx and are read off disk by src/build.js. Without this
+      # sibling checkout, loadTheme() throws and no landing page renders.
+      - uses: actions/checkout@v4
+        with:
+          repository: mindattic/MindAttic.UiUx
+          path: MindAttic.UiUx
+          token: ${{ secrets.SUBSCRIBER_REPO_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: MindAttic.Deploy/package-lock.json
 
-      - run: npm ci
+      - name: Install
+        working-directory: MindAttic.Deploy
+        run: npm ci
 
       - name: Deploy
+        working-directory: MindAttic.Deploy
         env:
           MINDATTIC_FTP_JSON:      ${{ secrets.MINDATTIC_FTP_JSON }}
           SUBSCRIBER_REPO_TOKEN:   ${{ secrets.SUBSCRIBER_REPO_TOKEN }}
         run: |
+          themes="../MindAttic.UiUx/Themes"
           if [ -n "${{ inputs.only }}" ]; then
-            npm run deploy -- --from-github --only "${{ inputs.only }}"
+            npm run deploy -- --from-github --themes-root "$themes" --only "${{ inputs.only }}"
           else
-            npm run deploy -- --from-github
+            npm run deploy -- --from-github --themes-root "$themes"
           fi
