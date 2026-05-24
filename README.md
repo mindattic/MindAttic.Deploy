@@ -61,7 +61,7 @@ That's the entire pipeline. There is no per-project deploy state.
    ```
 2. `npm run deploy -- --only newproject`
 
-That's it.
+That's it. (`theme` is required for `catalog-landing` entries; valid values match folder names under `MindAttic.UIUX/Themes/` — today: `Cyberspace` for software projects, `Hardware` for hardware build guides.)
 
 ---
 
@@ -123,6 +123,6 @@ See `CLAUDE.md` for the in-flight migration plan.
 - [x] Replace every per-project `.claude/skills/deploy/SKILL.md` (and `commands/deploy.md`) with shims that call `MindAttic.Deploy`. Both catalog projects (`--only <slug>`) and Blazor app projects (`--app <slug>`) now point here.
 - [x] Add `apps[]` + `--app` / `--apps` / `--dry-run` for Blazor/GitHub-Actions-driven deploys. StreetSamurai is enabled; IdiotProof, TaxRateCollector, ThinkTank, Tutor are stubbed (disabled with notes).
 - [x] Delete orphaned local deploy files (`scripts/cli/deploy.*`, `deploy.settings.json*`, root-site `deploy.{bat,ps1}` + `settings.json`) across every MindAttic project; update Vault settings.json `runCommand` entries (the 3 root sites no longer prefix `deploy.bat &&`). Per-repo `git rm` + commit; user pushes.
-- [x] `MindAttic.Deploy.Cli` (C# console app modelled on MindAttic.Terminal). Spectre.Console.Cli, `net10.0`. Commands: `catalog`, `site`, `app`, `version`. Default (no args) is an interactive multi-select prompt grouping catalog + sites + apps. Shells into the canonical `node src/deploy.js` pipeline.
+- [x] `MindAttic.Deploy.Cli` (C# console app modelled on MindAttic.Console). Spectre.Console.Cli, `net10.0`. Commands: `catalog`, `site`, `app`, `version`. Default (no args) is an interactive multi-select prompt grouping catalog + sites + apps. Shells into the canonical `node src/deploy.js` pipeline.
 
 `StreetSamurai` stays Azure-CI-deployed. `MindAttic.UiUx`'s `/deploy` (component fanout) stays where it is.

@@ -17,7 +17,7 @@ public sealed class MainMenuCommand : Command
         var roster = ProjectRoster.Load();
         var runner = new DeployRunner(roster.RepoRoot);
 
-        AnsiConsole.Write(new FigletText("MindAttic.Deploy").Color(Color.Cyan1));
+        AnsiConsole.Write(new Rule("[cyan1]MindAttic.Deploy[/]").LeftJustified());
         AnsiConsole.MarkupLine($"[grey]repo: {roster.RepoRoot}[/]");
         AnsiConsole.WriteLine();
 

@@ -53,13 +53,13 @@ Every MindAttic project's `/deploy` slash command (slash or skill) now shims int
 Catalog landing pages for the 4 disabled-app projects are deployed centrally from MindAttic.Deploy (`npm run deploy -- --only <slug>`), NOT from each project's `/deploy`.
 
 ## Adding a new landing page
-1. Append a project block to `projects.json` (`slug`, `repo`, `title`, `tagline`).
+1. Append a project block to `projects.json` (`slug`, `repo`, `title`, `tagline`, `theme`). Valid themes today: `Cyberspace` (default for software projects) or `Hardware` (Claudia, ChiMesh).
 2. `npm run deploy -- --only <slug>` -- builds and pushes only the new one.
 
 That is the entire procedure. No scaffold script, no per-project `scripts/cli/`, no marker blocks.
 
 ## Removing a landing page
-1. Remove the block from `projects.json`. The next deploy stops touching it (the server copy stays until you delete the directory on the FTP host).
+1. Remove the block from `projects.json`. The next deploy stops touching it; the server copy of `mindattic.com/<slug>.htm` stays until you manually FTP-delete it. (For projects migrated from the old 3-file subfolder pipeline -- Claudia, ChiMesh -- the legacy `mindattic.com/<slug>/` subdirectory also lingers until deleted.)
 
 ## Credentials
 - Local: `secrets/ftp.json` (gitignored). Real value committed to `secrets/ftp.json` already in the dev environment.
