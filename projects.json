@@ -127,13 +127,6 @@
       "theme":   "Cyberspace"
     },
     {
-      "slug":    "mindatticmobile",
-      "repo":    "MindAttic.Mobile",
-      "title":   "MindAttic.Mobile",
-      "tagline": "Self-hosted bridge exposing ConPTY-wrapped CLI sessions to any browser on your tailnet.",
-      "theme":   "Cyberspace"
-    },
-    {
       "slug":    "mindatticpsst",
       "repo":    "MindAttic.Psst",
       "title":   "MindAttic.Psst",

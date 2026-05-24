@@ -21,7 +21,7 @@ Anything that ships via FTP. Today that's:
 
 | Array in `projects.json` | Examples | Remote |
 |---|---|---|
-| `projects[]` — catalog landing page (README -> `<slug>.htm`) | idiotproof, mindatticlegion, mindatticvault, taxratecollector, thinktank, tutor, mediabutler, gridgame2026, mindatticmobile, mindatticpsst | `/mindattic.com/<slug>.htm` |
+| `projects[]` — catalog landing page (README -> `<slug>.htm`) | idiotproof, mindatticlegion, mindatticvault, taxratecollector, thinktank, tutor, mediabutler, gridgame2026, mindatticpsst | `/mindattic.com/<slug>.htm` |
 | `projects[]` — long-form build guide (same renderer, Hardware theme) | claudia, chimesh | `/mindattic.com/<slug>.htm` |
 | `sites[]` — verbatim root-site FTP upload | mindattic.com, mindatticcares.com, ryandebraal.com | site root |
 | `apps[]` — Blazor / GitHub-Actions deploys (CI does the actual push) | streetsamurai (enabled); idiotproof, taxratecollector, thinktank, tutor (stubbed pending Azure infra) | — |
@@ -110,7 +110,7 @@ Lookup order in `deploy.js`: `MINDATTIC_FTP_JSON` env -> APPDATA Vault file -> l
 |----------------------------------------------------------------|----------------------------------|
 | Per-project `scripts/cli/build-html.js`, `deploy.ps1`, `deploy.bat`, `deploy.settings.json`, `package.json`, `node_modules/` | one repo, one `package.json`, one install |
 | One `deploy.settings.json` per project, each with the same FTP credentials | one Vault entry at `%APPDATA%\MindAttic\Deploy\ftp.json` |
-| 12 `index.htm` files in 12 repos with marker blocks            | rendered artifacts in `out/`     |
+| 11 `index.htm` files in 11 repos with marker blocks            | rendered artifacts in `out/`     |
 | `sync-landing-page.ps1` + `sync-claudia.ps1` + `sync-chimesh.ps1` + 13 entries in `MindAttic.UiUx/subscribers.json` | zero sync scripts, zero splice for landing pages — MindAttic.UiUx now only owns the three splice subscribers it still needs (mindattic.com, StreetSamurai, MindAttic.Psst legal pages) |
 | Per-project `.claude/commands/deploy.md` doing real work       | per-project shim -> `MindAttic.Deploy/bin/deploy.ps1 --only <slug>` (catalog) or `--app <slug>` (Blazor) |
 
@@ -122,7 +122,7 @@ Components and themes are loaded via CDN (`jsDelivr`) at runtime instead of bein
 
 See `CLAUDE.md` for the in-flight migration plan.
 
-- [x] Catalog landing pages (12 README-driven sites: idiotproof, gridgame2026, mindatticlegion, mindatticmobile, mindatticpsst, mindatticvault, taxratecollector, thinktank, tutor, mediabutler, claudia, chimesh).
+- [x] Catalog landing pages (11 README-driven sites: idiotproof, gridgame2026, mindatticlegion, mindatticpsst, mindatticvault, taxratecollector, thinktank, tutor, mediabutler, claudia, chimesh).
 - [x] Rename `MindAttic.Catalog` -> `MindAttic.Deploy` on disk.
 - [x] Port mindattic.com, mindatticcares.com, and ryandebraal.com root-site deploys — `--site <slug>` / `--sites`.
 - [x] Replace every per-project `.claude/skills/deploy/SKILL.md` (and `commands/deploy.md`) with shims that call `MindAttic.Deploy`. Both catalog projects (`--only <slug>`) and Blazor app projects (`--app <slug>`) now point here.
