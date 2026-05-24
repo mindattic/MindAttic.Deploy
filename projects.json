@@ -113,13 +113,6 @@
       "theme":   "Cyberspace"
     },
     {
-      "slug":    "fractionsofacent",
-      "repo":    "FractionsOfACent",
-      "title":   "FractionsOfACent",
-      "tagline": "Scans public GitHub for leaked API keys, DB connection strings, private keys, and JWTs.",
-      "theme":   "Cyberspace"
-    },
-    {
       "slug":    "gridgame2026",
       "repo":    "GridGame2026",
       "title":   "GridGame2026",

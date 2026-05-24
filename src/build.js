@@ -46,6 +46,51 @@ const argv = process.argv.slice(2).flatMap((a) => {
     return [a];
 });
 
+const USAGE = `\
+build.js -- render every project's README into out/<slug>.htm.
+
+Flags:
+  --only <slug>        build a single project (repeatable)
+  --ref <branch|tag>   git ref for README fetch (default: main)
+  --from-github        skip sibling-dir README lookup; force network fetch
+  --siblings-root <p>  override sibling lookup root
+  --themes-root <p>    path to MindAttic.UIUX/Themes
+  --components <ref>   override the MindAttic.UIUX CDN ref pinned in projects.json
+  --help, -h           show this help and exit
+
+Run: node src/build.js [flags]
+`;
+
+if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(USAGE);
+    process.exit(0);
+}
+
+// Reject unknown flags up front so a typo (e.g. --hlep) does not silently
+// trigger a full build of every catalog project.
+const KNOWN_FLAGS = new Set([
+    'only', 'ref', 'from-github', 'siblings-root', 'themes-root', 'components', 'help',
+]);
+for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--')) {
+        const name = a.slice(2);
+        if (!KNOWN_FLAGS.has(name)) {
+            process.stderr.write(`build.js: unknown flag --${name}\n\n${USAGE}`);
+            process.exit(2);
+        }
+        // Skip the value slot for flags that consume one, so we don't try to
+        // validate the value itself (it never starts with -- because the
+        // string/flagAll parsers reject that).
+        const takesValue = name === 'only' || name === 'ref'
+            || name === 'siblings-root' || name === 'themes-root' || name === 'components';
+        if (takesValue) i++;
+    } else if (a.startsWith('-') && a !== '-') {
+        process.stderr.write(`build.js: unknown flag ${a}\n\n${USAGE}`);
+        process.exit(2);
+    }
+}
+
 function boolFlag(name) {
     return argv.includes('--' + name);
 }

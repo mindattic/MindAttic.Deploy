@@ -5,12 +5,12 @@
 
 ## What this is
 - Single-source generator + FTPS deployer for every `mindattic.com/<slug>/` landing page.
-- Replaces the per-project `scripts/cli/build-html.js` + `deploy.ps1` + `deploy.bat` + `deploy.settings.json` + `package.json` + `node_modules/` machinery that used to live in each of the 13 README-driven projects.
-- Replaces the `kind: "landing-page"` and `kind: "build-html-js"` paths in `MindAttic.UIUX/subscribers.json` and the corresponding `sync-landing-page.ps1` / `sync-claudia.ps1` / `sync-chimesh.ps1` splice machinery.
+- Replaces the per-project `scripts/cli/build-html.js` + `deploy.ps1` + `deploy.bat` + `deploy.settings.json` + `package.json` + `node_modules/` machinery that used to live in each README-driven project.
+- Owns the `landing-page` and `build-html-js` paths that used to live in `MindAttic.UiUx/subscribers.json`. Those entries (and `sync-landing-page.ps1`, `sync-claudia.ps1`, `sync-chimesh.ps1`) have been deleted from MindAttic.UiUx — do not recreate them. MindAttic.UiUx now only owns the three splice subscribers that genuinely need build-time inlining (`mindattic.com/index.htm`, `StreetSamurai/wwwroot/`, `MindAttic.Psst/{terms,privacy}.htm`); this repo invokes the first two as `preDeploy` hooks.
 
 ## Layout
 - `projects.json` -- canonical list of every landing page (slug, repo, title, tagline). Edit ONLY this to add/remove/retag a project.
-- `template/index.template.htm` -- the single canonical landing-page HTML. Uses `{{PLACEHOLDER}}` substitution and CDN-loaded MindAttic.UIUX.
+- `template/index.template.htm` -- the single canonical landing-page HTML. Uses `{{PLACEHOLDER}}` substitution and CDN-loaded MindAttic.UiUx.
 - `src/build.js` -- README -> out/&lt;slug&gt;/index.htm renderer (marked + highlight.js).
 - `src/deploy.js` -- FTPS uploader (basic-ftp); runs build implicitly unless `--skip-build`.
 - `secrets/ftp.json` -- gitignored FTP credentials (template at `ftp.json.template`).
@@ -19,9 +19,9 @@
 
 ## Editing rules
 - **Project metadata (title / tagline / new project / removed project)**: edit `projects.json` only.
-- **Visual design / layout of every landing page**: edit `template/index.template.htm`. All 13 sites change on the next deploy.
+- **Visual design / layout of every landing page**: edit `template/index.template.htm`. Every `projects[]` entry picks up the change on the next deploy.
 - **README content of a project**: edit the README in that project's repo. The catalog fetches it at build time (sibling dir on dev box, GitHub raw URL in CI).
-- **Reusable components (fonts, Cyberspace, BackHomeM)**: edit in `MindAttic.UIUX/` and bump `componentsVersion` in `projects.json` to pin landing pages to a new ref.
+- **Reusable components (fonts, Cyberspace, BackHomeM)**: edit in `MindAttic.UiUx/` and bump `componentsVersion` in `projects.json` to pin landing pages to a new ref.
 - **Per-project index.htm in the project's own repo**: should not exist after the migration. If you find one, it is a derived artifact; delete it.
 
 ## Commands
@@ -59,7 +59,7 @@ Catalog landing pages for the 4 disabled-app projects are deployed centrally fro
 That is the entire procedure. No scaffold script, no per-project `scripts/cli/`, no marker blocks.
 
 ## Removing a landing page
-1. Remove the block from `projects.json`. The next deploy stops touching it; the server copy of `mindattic.com/<slug>.htm` stays until you manually FTP-delete it. (For projects migrated from the old 3-file subfolder pipeline -- Claudia, ChiMesh -- the legacy `mindattic.com/<slug>/` subdirectory also lingers until deleted.)
+1. Remove the block from `projects.json`. The next deploy stops touching it; the server copy of `mindattic.com/<slug>.htm` stays until you manually FTP-delete it.
 
 ## Credentials
 - Local: `secrets/ftp.json` (gitignored). Real value committed to `secrets/ftp.json` already in the dev environment.

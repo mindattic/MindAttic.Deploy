@@ -54,6 +54,50 @@ const argv = process.argv.slice(2).flatMap((a) => {
     return [a];
 });
 
+const USAGE = `\
+deploy.js -- three pipelines under one roof (catalog / sites / apps).
+
+Flags (also accept --flag=value form):
+  --only <slug>        catalog mode: deploy a landing page (repeatable)
+  --site <slug>        site mode:    deploy a single root site
+  --sites              site mode:    deploy every root site
+  --app <slug>         app mode:     deploy a single Blazor app via GitHub Actions
+  --apps               app mode:     deploy every enabled app
+  --include-disabled   app mode:     include disabled apps in --apps iteration
+  --dry-run            preview without firing (no FTP, no git push)
+  --skip-build         catalog mode: skip the implicit build step
+  --help, -h           show this help and exit
+
+Run: node src/deploy.js [flags]
+`;
+
+if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(USAGE);
+    process.exit(0);
+}
+
+// Reject unknown flags up front. The original parser ignored anything it did
+// not recognize, so `node src/deploy.js --help` silently ran a full FTPS
+// deploy of every catalog landing page. Fail loudly instead.
+const KNOWN_FLAGS = new Set([
+    'only', 'site', 'sites', 'app', 'apps', 'include-disabled', 'dry-run', 'skip-build', 'help',
+]);
+for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--')) {
+        const name = a.slice(2);
+        if (!KNOWN_FLAGS.has(name)) {
+            process.stderr.write(`deploy.js: unknown flag --${name}\n\n${USAGE}`);
+            process.exit(2);
+        }
+        const takesValue = name === 'only' || name === 'site' || name === 'app';
+        if (takesValue) i++;
+    } else if (a.startsWith('-') && a !== '-') {
+        process.stderr.write(`deploy.js: unknown flag ${a}\n\n${USAGE}`);
+        process.exit(2);
+    }
+}
+
 function boolFlag(name) {
     return argv.includes('--' + name);
 }
