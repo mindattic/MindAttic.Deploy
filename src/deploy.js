@@ -66,6 +66,14 @@ Flags (also accept --flag=value form):
   --include-disabled   app mode:     include disabled apps in --apps iteration
   --dry-run            preview without firing (no FTP, no git push)
   --skip-build         catalog mode: skip the implicit build step
+
+  Forwarded to src/build.js (catalog mode only):
+  --from-github        force README fetch from GitHub raw (used in CI)
+  --ref <branch|tag>   git ref for README fetch
+  --siblings-root <p>  override sibling-repo lookup root
+  --themes-root <p>    path to MindAttic.UiUx/Themes
+  --components <ref>   override the MindAttic.UiUx CDN ref pinned in projects.json
+
   --help, -h           show this help and exit
 
 Run: node src/deploy.js [flags]
@@ -80,8 +88,12 @@ if (argv.includes('--help') || argv.includes('-h')) {
 // not recognize, so `node src/deploy.js --help` silently ran a full FTPS
 // deploy of every catalog landing page. Fail loudly instead.
 const KNOWN_FLAGS = new Set([
-    'only', 'site', 'sites', 'app', 'apps', 'include-disabled', 'dry-run', 'skip-build', 'help',
+    'only', 'site', 'sites', 'app', 'apps', 'include-disabled', 'dry-run', 'skip-build',
+    // Forwarded to build.js when running catalog mode (CI uses --from-github).
+    'from-github', 'ref', 'siblings-root', 'themes-root', 'components',
+    'help',
 ]);
+const VALUE_FLAGS = new Set(['only', 'site', 'app', 'ref', 'siblings-root', 'themes-root', 'components']);
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--')) {
@@ -90,8 +102,7 @@ for (let i = 0; i < argv.length; i++) {
             process.stderr.write(`deploy.js: unknown flag --${name}\n\n${USAGE}`);
             process.exit(2);
         }
-        const takesValue = name === 'only' || name === 'site' || name === 'app';
-        if (takesValue) i++;
+        if (VALUE_FLAGS.has(name)) i++;
     } else if (a.startsWith('-') && a !== '-') {
         process.stderr.write(`deploy.js: unknown flag ${a}\n\n${USAGE}`);
         process.exit(2);
@@ -149,6 +160,14 @@ function runBuild() {
     return new Promise((resolve, reject) => {
         const args = ['src/build.js'];
         for (const slug of onlySlugs) args.push('--only', slug);
+        // Forward every build-relevant flag we accept. Previously only --only
+        // was forwarded, so CI's `--from-github` was a silent no-op.
+        if (boolFlag('from-github')) args.push('--from-github');
+        const passthroughString = ['ref', 'siblings-root', 'themes-root', 'components'];
+        for (const name of passthroughString) {
+            const v = stringFlag(name);
+            if (v !== undefined) args.push('--' + name, v);
+        }
         const proc = child_process.spawn(process.execPath, args, { cwd: repoRoot, stdio: 'inherit' });
         proc.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`build.js exited ${code}`)));
         proc.on('error', reject);

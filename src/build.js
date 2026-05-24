@@ -8,17 +8,17 @@
  *   3. raw.githubusercontent fallback if the sibling is missing
  *
  * Theme bundle (theme.css + body-prelude.html + deps.json) is loaded from:
- *   1. sibling dir      : D:\Projects\MindAttic\MindAttic.UIUX\Themes\<Theme>\* (default)
+ *   1. sibling dir      : D:\Projects\MindAttic\MindAttic.UiUx\Themes\<Theme>\* (default)
  *   2. --themes-root    : override path
- * (CI: GitHub Actions checks out MindAttic.UIUX into a sibling and sets --themes-root.)
+ * (CI: GitHub Actions checks out MindAttic.UiUx into a sibling and sets --themes-root.)
  *
  * Flags:
  *   --only <slug>        : build a single project
  *   --ref <branch|tag>   : git ref for README fetch (default: main)
  *   --from-github        : skip sibling-dir README lookup; force network fetch
  *   --siblings-root <p>  : override sibling lookup root
- *   --themes-root <p>    : path to MindAttic.UIUX/Themes (default: ../MindAttic.UIUX/Themes)
- *   --components <ref>   : override the MindAttic.UIUX CDN ref pinned in projects.json
+ *   --themes-root <p>    : path to MindAttic.UiUx/Themes (default: ../MindAttic.UiUx/Themes)
+ *   --components <ref>   : override the MindAttic.UiUx CDN ref pinned in projects.json
  *
  * Run: node src/build.js [flags]
  */
@@ -54,8 +54,8 @@ Flags:
   --ref <branch|tag>   git ref for README fetch (default: main)
   --from-github        skip sibling-dir README lookup; force network fetch
   --siblings-root <p>  override sibling lookup root
-  --themes-root <p>    path to MindAttic.UIUX/Themes
-  --components <ref>   override the MindAttic.UIUX CDN ref pinned in projects.json
+  --themes-root <p>    path to MindAttic.UiUx/Themes
+  --components <ref>   override the MindAttic.UiUx CDN ref pinned in projects.json
   --help, -h           show this help and exit
 
 Run: node src/build.js [flags]
@@ -122,10 +122,10 @@ const onlySlugs     = flagAll('only');
 const refOverride   = stringFlag('ref');
 const forceGithub   = boolFlag('from-github');
 const siblingsRoot  = stringFlag('siblings-root') || path.resolve(repoRoot, '..');
-const themesRoot    = stringFlag('themes-root') || path.resolve(repoRoot, '..', 'MindAttic.UIUX', 'Themes');
+const themesRoot    = stringFlag('themes-root') || path.resolve(repoRoot, '..', 'MindAttic.UiUx', 'Themes');
 const componentsRef = stringFlag('components');
 
-const CDN_BASE = 'https://cdn.jsdelivr.net/gh/mindattic/MindAttic.UIUX';
+const CDN_BASE = 'https://cdn.jsdelivr.net/gh/mindattic/MindAttic.UiUx';
 
 function slugifyAnchor(t) {
     return String(t).toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
@@ -202,7 +202,7 @@ async function loadTheme(themeName, componentsVersion) {
 
     const themeDir = path.join(themesRoot, themeName);
     if (!fs.existsSync(themeDir)) {
-        throw new Error(`Theme '${themeName}' not found at ${themeDir}. Add it under MindAttic.UIUX/Themes/${themeName}/, or pass --themes-root.`);
+        throw new Error(`Theme '${themeName}' not found at ${themeDir}. Add it under MindAttic.UiUx/Themes/${themeName}/, or pass --themes-root.`);
     }
     const depsPath    = path.join(themeDir, 'deps.json');
     const preludePath = path.join(themeDir, 'body-prelude.html');
