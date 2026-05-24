@@ -3,3 +3,9 @@ package-lock.json
 out/
 secrets/ftp.json
 .DS_Store
+
+# MindAttic.Deploy.Cli build outputs
+**/bin/
+**/obj/
+*.user
+.vs/

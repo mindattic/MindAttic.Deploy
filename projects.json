@@ -1,9 +1,108 @@
 {
-  "$comment": "Canonical registry of every README-driven landing page at mindattic.com/<slug>.htm. Edit ONLY this file to add, remove, or retag a project. Build = node src/build.js. Deploy = node src/deploy.js. componentsVersion pins the jsDelivr tag for MindAttic.UIUX (Components and Themes both come from this ref); use 'main' for tip-of-tree, or 'v1.0.0' style tags for immutable cache hits in production. Each project picks a theme via the 'theme' field; valid values match folder names under MindAttic.UIUX/Themes/ (currently: Cyberspace, Hardware).",
+  "$comment": "Canonical registry for MindAttic.Deploy. Three arrays: `projects` is README-driven landing pages at mindattic.com/<slug>.htm (rendered via template/index.template.htm); `sites` is verbatim root-site FTP uploads (mindattic.com root, mindatticcares.com, ryandebraal.com); `apps` is Blazor / GitHub-Actions-driven deploys (StreetSamurai today; IdiotProof/TaxRateCollector/ThinkTank/Tutor stubbed pending infra). Build/Deploy = node src/build.js / src/deploy.js. componentsVersion pins the jsDelivr tag for MindAttic.UIUX (Components and Themes both come from this ref); use 'main' for tip-of-tree, or 'v1.0.0' style tags for immutable cache hits in production. Each project picks a theme via the 'theme' field; valid values match folder names under MindAttic.UIUX/Themes/ (currently: Cyberspace, Hardware).",
 
   "componentsVersion": "main",
 
   "ftpRemoteRoot": "/mindattic.com",
+
+  "apps": [
+    {
+      "slug":          "streetsamurai",
+      "sourceDir":     "../StreetSamurai",
+      "repo":          "mindattic/StreetSamurai",
+      "branch":        "master",
+      "workflow":      "azure-deploy.yml",
+      "disabled":      false,
+      "stageOnly":     ["v3/StreetSamurai.Blazor/wwwroot"],
+      "commitMessage": "Sync MindAttic.UiUx for deploy ({utc})",
+      "preDeploy": [
+        { "kind": "uiux-pull",    "required": true },
+        { "kind": "powershell",   "file": "../MindAttic.UiUx/sync/sync-streetsamurai.ps1", "required": true },
+        { "kind": "dotnet-build", "project": "../StreetSamurai/v3/StreetSamurai.Blazor/StreetSamurai.Blazor.csproj", "configuration": "Release", "required": true }
+      ]
+    },
+    {
+      "slug":          "idiotproof",
+      "sourceDir":     "../IdiotProof",
+      "repo":          "mindattic/IdiotProof",
+      "branch":        "main",
+      "workflow":      "deploy.yml",
+      "disabled":      true,
+      "disabledNote":  "Workflow targets `idiotproof-web` App Service. Needs Azure infrastructure + AZURE_WEBAPP_PUBLISH_PROFILE secret in mindattic/IdiotProof. Set `disabled: false` once those exist.",
+      "stageOnly":     [],
+      "preDeploy": [
+        { "kind": "dotnet-build", "project": "../IdiotProof/src/IdiotProof.Blazor/IdiotProof.Blazor.csproj", "configuration": "Release", "required": true }
+      ]
+    },
+    {
+      "slug":          "taxratecollector",
+      "sourceDir":     "../TaxRateCollector",
+      "repo":          "mindattic/TaxRateCollector",
+      "branch":        "main",
+      "workflow":      "azure-deploy.yml",
+      "disabled":      true,
+      "disabledNote":  "Workflow targets `taxratecollector` App Service. Needs Azure infrastructure + AZURE_WEBAPP_PUBLISH_PROFILE secret in mindattic/TaxRateCollector. Set `disabled: false` once those exist.",
+      "stageOnly":     [],
+      "preDeploy": [
+        { "kind": "dotnet-build", "project": "../TaxRateCollector/TaxRateCollector.Blazor/TaxRateCollector.Blazor.csproj", "configuration": "Release", "required": true }
+      ]
+    },
+    {
+      "slug":          "thinktank",
+      "sourceDir":     "../ThinkTank",
+      "repo":          "mindattic/ThinkTank",
+      "branch":        "main",
+      "workflow":      "azure-deploy.yml",
+      "disabled":      true,
+      "disabledNote":  "No workflow yet. Add .github/workflows/azure-deploy.yml (mirror StreetSamurai's pattern), provision an Azure App Service, add AZURE_WEBAPP_PUBLISH_PROFILE secret, then set `disabled: false`.",
+      "stageOnly":     [],
+      "preDeploy": [
+        { "kind": "dotnet-build", "project": "../ThinkTank/ThinkTank.Blazor/ThinkTank.Blazor.csproj", "configuration": "Release", "required": true }
+      ]
+    },
+    {
+      "slug":          "tutor",
+      "sourceDir":     "../Tutor",
+      "repo":          "mindattic/Tutor",
+      "branch":        "main",
+      "workflow":      "azure-deploy.yml",
+      "disabled":      true,
+      "disabledNote":  "No workflow yet. Add .github/workflows/azure-deploy.yml (mirror StreetSamurai's pattern), provision an Azure App Service, add AZURE_WEBAPP_PUBLISH_PROFILE secret, then set `disabled: false`.",
+      "stageOnly":     [],
+      "preDeploy": [
+        { "kind": "dotnet-build", "project": "../Tutor/Tutor.Blazor/Tutor.Blazor.csproj", "configuration": "Release", "required": true }
+      ]
+    }
+  ],
+
+  "sites": [
+    {
+      "slug":          "mindattic.com",
+      "sourceDir":     "../mindattic.com",
+      "ftpRemotePath": "/mindattic.com",
+      "files":         ["*.htm"],
+      "stampFile":     "index.htm",
+      "preDeploy": [
+        { "kind": "uiux-pull",  "required": true },
+        { "kind": "powershell", "file": "../MindAttic.UiUx/sync/sync-mindattic-com.ps1", "args": ["-TargetIndex", "../mindattic.com/index.htm"], "required": true },
+        { "kind": "powershell", "file": "../mindattic.com/fetch-descriptions.ps1", "required": false }
+      ]
+    },
+    {
+      "slug":          "mindatticcares.com",
+      "sourceDir":     "../mindatticcares.com",
+      "ftpRemotePath": "/mindatticcares.com",
+      "files":         ["index.htm"],
+      "stampFile":     "index.htm"
+    },
+    {
+      "slug":          "ryandebraal.com",
+      "sourceDir":     "../ryandebraal.com",
+      "ftpRemotePath": "/",
+      "files":         ["index.htm"],
+      "stampFile":     "index.htm"
+    }
+  ],
 
   "projects": [
     {

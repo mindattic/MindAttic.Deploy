@@ -89,7 +89,7 @@ function htmlAttrEscape(s) {
 
 function fetchRaw(url, token) {
     return new Promise((resolve, reject) => {
-        const headers = { 'User-Agent': 'MindAttic.Catalog/1.0' };
+        const headers = { 'User-Agent': 'MindAttic.Deploy/1.0' };
         if (token) headers['Authorization'] = 'token ' + token;
         const req = https.get(url, { headers }, (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {

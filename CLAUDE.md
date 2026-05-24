@@ -1,4 +1,4 @@
-# MindAttic.Catalog Project Rules
+# MindAttic.Deploy Project Rules
 
 ## Conversation
 - A bare "do" / "do it" / "yes" from the user means "continue", "keep going", "proceed". Resume the current task without asking for clarification.
@@ -25,11 +25,32 @@
 - **Per-project index.htm in the project's own repo**: should not exist after the migration. If you find one, it is a derived artifact; delete it.
 
 ## Commands
-- `npm run build` -- regenerate `out/<slug>/index.htm` for every project.
-- `npm run build -- --only mindatticvault` -- single project.
+- `npm run build` -- regenerate `out/<slug>/index.htm` for every catalog project.
+- `npm run build -- --only mindatticvault` -- single catalog project.
 - `npm run build -- --from-github --ref main` -- force-fetch READMEs from GitHub (default reads from `D:\Projects\MindAttic\<repo>\README.md` if present).
-- `npm run deploy` -- build then FTPS upload everything.
-- `npm run deploy -- --only mindatticvault --skip-build` -- single-project redeploy without rebuilding.
+- `npm run deploy` -- build then FTPS upload every catalog project (does NOT touch `sites[]`).
+- `npm run deploy -- --only mindatticvault --skip-build` -- single catalog project redeploy without rebuilding.
+- `npm run deploy -- --site mindattic.com` -- deploy a single root site (runs that site's preDeploy hooks + stamp + FTPS upload).
+- `npm run deploy -- --sites` -- deploy every root site in `projects.json/sites[]`.
+- `npm run deploy -- --app streetsamurai` -- deploy a single Blazor app via GitHub Actions (preDeploy hooks + commit `stageOnly` paths + push the configured branch, which fires the project's workflow).
+- `npm run deploy -- --apps` -- deploy every enabled app in `projects.json/apps[]`.
+- `npm run deploy -- --app streetsamurai --dry-run` -- run preDeploy hooks + report the planned commit/push without executing them. Useful for sanity-checking a sync + build before pushing master.
+
+## Root sites (`projects.json/sites[]`)
+- Verbatim FTPS uploads — NOT rendered through `template/index.template.htm`. Each entry: `slug`, `sourceDir` (relative to MindAttic.Deploy repo root), `ftpRemotePath`, `files` (glob like `*.htm` or exact name), `stampFile` (which file gets the `<!-- Last Updated: ... -->` stamp), and optional `preDeploy[]` hooks.
+- The per-site `deploy.ps1` / `deploy.bat` / `settings.json` in each root-site repo are dead after migration -- credentials come from MindAttic.Deploy's central `secrets/ftp.json`.
+
+## Apps (`projects.json/apps[]`)
+- GitHub-Actions-driven deploys. Currently 5 entries: StreetSamurai (enabled, ships to Azure App Service via push-to-master) + IdiotProof / TaxRateCollector / ThinkTank / Tutor (all `disabled: true` pending Azure infra + `AZURE_WEBAPP_PUBLISH_PROFILE` secret).
+- Each entry: `slug`, `sourceDir`, `repo` (owner/name), `branch`, `workflow` (file name in `.github/workflows/`), `disabled` (bool), `disabledNote` (string), `stageOnly` (paths to `git add` before commit; empty = nothing to stage), `commitMessage` (template, `{utc}` is substituted), `preDeploy[]`.
+- preDeploy hook kinds: `uiux-pull`, `powershell`, `dotnet-build` (runs `dotnet build <project> -c <configuration> --nologo`; non-zero exit fails the deploy unless `required: false`).
+- Disabled apps: `--app <slug>` prints the `disabledNote` and exits 0. To enable, set `disabled: false`.
+
+## Per-project `/deploy` shims
+Every MindAttic project's `/deploy` slash command (slash or skill) now shims into `MindAttic.Deploy`. One `/deploy` per project. Two patterns:
+- **App projects** (StreetSamurai, IdiotProof, TaxRateCollector, ThinkTank, Tutor): `/deploy` -> `npm run deploy -- --app <slug>` (deploys the APP).
+- **Catalog-only projects** (everything else): `/deploy` -> `npm run deploy -- --only <slug>` (deploys the landing page).
+Catalog landing pages for the 4 disabled-app projects are deployed centrally from MindAttic.Deploy (`npm run deploy -- --only <slug>`), NOT from each project's `/deploy`.
 
 ## Adding a new landing page
 1. Append a project block to `projects.json` (`slug`, `repo`, `title`, `tagline`).
