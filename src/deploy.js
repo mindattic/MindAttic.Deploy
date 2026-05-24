@@ -19,14 +19,15 @@
  *     .github/workflows/<workflow>.yml. Disabled apps print their note
  *     and skip without firing.
  *
- * Flags:
- *   --only <slug>   : catalog mode -- deploy a single landing page
- *   --site <slug>   : site mode    -- deploy a single root site
- *   --sites         : site mode    -- deploy every root site
- *   --app <slug>    : app mode     -- deploy a single Blazor app (via GitHub Actions)
- *   --apps          : app mode     -- deploy every enabled app
- *   --dry-run       : app mode     -- run preDeploy hooks + report the planned commit/push without executing them
- *   --skip-build    : catalog mode -- skip the implicit build step
+ * Flags (also accept `--flag=value` form):
+ *   --only <slug>          : catalog mode -- deploy a landing page; repeatable for a batch
+ *   --site <slug>          : site mode    -- deploy a single root site
+ *   --sites                : site mode    -- deploy every root site
+ *   --app <slug>           : app mode     -- deploy a single Blazor app (via GitHub Actions)
+ *   --apps                 : app mode     -- deploy every ENABLED app (use --include-disabled to surface stubs)
+ *   --include-disabled     : app mode     -- include `disabled: true` apps in --apps iteration
+ *   --dry-run              : app mode     -- run preDeploy hooks + report the planned commit/push without executing them
+ *   --skip-build           : catalog mode -- skip the implicit build step
  *
  * Credentials live in secrets/ftp.json (or MINDATTIC_FTP_JSON env in CI).
  */
@@ -44,22 +45,50 @@ const projectsPath = path.join(repoRoot, 'projects.json');
 const secretsPath  = path.join(repoRoot, 'secrets', 'ftp.json');
 const outRoot      = path.join(repoRoot, 'out');
 
-const argv = process.argv.slice(2);
-function flag(name) {
+// Normalize argv: split `--foo=bar` into `--foo` `bar` so the simple parser below works.
+const argv = process.argv.slice(2).flatMap((a) => {
+    if (a.startsWith('--') && a.includes('=')) {
+        const eq = a.indexOf('=');
+        return [a.slice(0, eq), a.slice(eq + 1)];
+    }
+    return [a];
+});
+
+function boolFlag(name) {
+    return argv.includes('--' + name);
+}
+
+function stringFlag(name) {
     const i = argv.indexOf('--' + name);
     if (i < 0) return undefined;
     const v = argv[i + 1];
-    if (v === undefined || v.startsWith('--')) return true;
+    if (v === undefined || v.startsWith('--')) {
+        throw new Error(`Flag --${name} requires a value (got ${v === undefined ? 'end of args' : 'another flag: ' + v}).`);
+    }
     return v;
 }
 
-const onlySlug  = flag('only');
-const siteSlug  = flag('site');
-const allSites  = flag('sites') === true;
-const appSlug   = flag('app');
-const allApps   = flag('apps') === true;
-const dryRun    = flag('dry-run') === true;
-const skipBuild = flag('skip-build') === true;
+function flagAll(name) {
+    const out = [];
+    for (let i = 0; i < argv.length; i++) {
+        if (argv[i] !== '--' + name) continue;
+        const v = argv[i + 1];
+        if (v === undefined || v.startsWith('--')) {
+            throw new Error(`Flag --${name} requires a value.`);
+        }
+        out.push(v);
+    }
+    return out;
+}
+
+const onlySlugs       = flagAll('only');
+const siteSlug        = stringFlag('site');
+const allSites        = boolFlag('sites');
+const appSlug         = stringFlag('app');
+const allApps         = boolFlag('apps');
+const dryRun          = boolFlag('dry-run');
+const skipBuild       = boolFlag('skip-build');
+const includeDisabled = boolFlag('include-disabled');
 
 function loadFtpSettings() {
     if (process.env.MINDATTIC_FTP_JSON) {
@@ -75,7 +104,7 @@ function loadFtpSettings() {
 function runBuild() {
     return new Promise((resolve, reject) => {
         const args = ['src/build.js'];
-        if (onlySlug) args.push('--only', onlySlug);
+        for (const slug of onlySlugs) args.push('--only', slug);
         const proc = child_process.spawn(process.execPath, args, { cwd: repoRoot, stdio: 'inherit' });
         proc.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`build.js exited ${code}`)));
         proc.on('error', reject);
@@ -299,6 +328,18 @@ async function runAppMode(config) {
         if (targets.length === 0) {
             throw new Error(`No app with slug '${appSlug}' (available: ${apps.map((a) => a.slug).join(', ')}).`);
         }
+    } else if (allApps && !includeDisabled) {
+        // --apps without explicit slug: skip disabled apps so the user does not accidentally fire a
+        // real push to master via --apps thinking it would be a no-op for everything.
+        const skipped = apps.filter((a) => a.disabled).map((a) => a.slug);
+        targets = apps.filter((a) => !a.disabled);
+        if (skipped.length > 0) {
+            process.stdout.write(`\nSkipping ${skipped.length} disabled app(s): ${skipped.join(', ')}  [pass --include-disabled to surface their notes]\n`);
+        }
+        if (targets.length === 0) {
+            process.stdout.write(`\nNo enabled apps in projects.json/apps[].\n`);
+            return;
+        }
     }
 
     process.stdout.write(`\nDeploying ${targets.length} app(s)${dryRun ? '  [DRY-RUN]' : ''}\n`);
@@ -388,9 +429,14 @@ async function runCatalogMode(config) {
     const ftpRemoteRoot = config.ftpRemoteRoot || '/mindattic.com';
 
     let projects = config.projects;
-    if (onlySlug) {
-        projects = projects.filter((p) => p.slug === onlySlug);
-        if (!projects.length) throw new Error(`No project with slug '${onlySlug}' in projects.json.`);
+    if (onlySlugs.length > 0) {
+        const known = new Set(projects.map((p) => p.slug));
+        const missing = onlySlugs.filter((s) => !known.has(s));
+        if (missing.length > 0) {
+            throw new Error(`Unknown catalog slug(s): ${missing.join(', ')}. Available: ${[...known].join(', ')}.`);
+        }
+        const wanted = new Set(onlySlugs);
+        projects = projects.filter((p) => wanted.has(p.slug));
     }
 
     if (!skipBuild) await runBuild();

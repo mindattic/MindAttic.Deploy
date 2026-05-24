@@ -37,21 +37,48 @@ const templatePath  = path.join(repoRoot, 'template', 'index.template.htm');
 const projectsPath  = path.join(repoRoot, 'projects.json');
 const outRoot       = path.join(repoRoot, 'out');
 
-const argv = process.argv.slice(2);
-function flag(name) {
+// Normalize argv: split `--foo=bar` into `--foo` `bar`.
+const argv = process.argv.slice(2).flatMap((a) => {
+    if (a.startsWith('--') && a.includes('=')) {
+        const eq = a.indexOf('=');
+        return [a.slice(0, eq), a.slice(eq + 1)];
+    }
+    return [a];
+});
+
+function boolFlag(name) {
+    return argv.includes('--' + name);
+}
+
+function stringFlag(name) {
     const i = argv.indexOf('--' + name);
     if (i < 0) return undefined;
     const v = argv[i + 1];
-    if (v === undefined || v.startsWith('--')) return true;
+    if (v === undefined || v.startsWith('--')) {
+        throw new Error(`Flag --${name} requires a value.`);
+    }
     return v;
 }
 
-const onlySlug      = flag('only');
-const refOverride   = flag('ref');
-const forceGithub   = flag('from-github') === true;
-const siblingsRoot  = flag('siblings-root') || path.resolve(repoRoot, '..');
-const themesRoot    = flag('themes-root') || path.resolve(repoRoot, '..', 'MindAttic.UIUX', 'Themes');
-const componentsRef = flag('components');
+function flagAll(name) {
+    const out = [];
+    for (let i = 0; i < argv.length; i++) {
+        if (argv[i] !== '--' + name) continue;
+        const v = argv[i + 1];
+        if (v === undefined || v.startsWith('--')) {
+            throw new Error(`Flag --${name} requires a value.`);
+        }
+        out.push(v);
+    }
+    return out;
+}
+
+const onlySlugs     = flagAll('only');
+const refOverride   = stringFlag('ref');
+const forceGithub   = boolFlag('from-github');
+const siblingsRoot  = stringFlag('siblings-root') || path.resolve(repoRoot, '..');
+const themesRoot    = stringFlag('themes-root') || path.resolve(repoRoot, '..', 'MindAttic.UIUX', 'Themes');
+const componentsRef = stringFlag('components');
 
 const CDN_BASE = 'https://cdn.jsdelivr.net/gh/mindattic/MindAttic.UIUX';
 
@@ -208,9 +235,14 @@ async function main() {
     const defaultComponentsRef = config.componentsVersion || 'main';
 
     let projects = config.projects;
-    if (onlySlug) {
-        projects = projects.filter((p) => p.slug === onlySlug);
-        if (!projects.length) throw new Error(`No project with slug '${onlySlug}' in projects.json.`);
+    if (onlySlugs.length > 0) {
+        const known = new Set(projects.map((p) => p.slug));
+        const missing = onlySlugs.filter((s) => !known.has(s));
+        if (missing.length > 0) {
+            throw new Error(`Unknown catalog slug(s): ${missing.join(', ')}. Available: ${[...known].join(', ')}.`);
+        }
+        const wanted = new Set(onlySlugs);
+        projects = projects.filter((p) => wanted.has(p.slug));
     }
 
     process.stdout.write(`Building ${projects.length} landing page(s) -> ${outRoot}\n`);
