@@ -80,8 +80,7 @@
       "repo":          "mindattic/Cursory",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
-      "disabled":      true,
-      "disabledNote":  "Workflow targets `cursory` App Service at cursory.azurewebsites.net. Needs Azure infrastructure + AZURE_WEBAPP_PUBLISH_PROFILE secret in mindattic/Cursory. Set `disabled: false` once those exist.",
+      "disabled":      false,
       "stageOnly":     [],
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../Cursory/Cursory.Blazor/Cursory.Blazor.csproj", "configuration": "Release", "required": true }
