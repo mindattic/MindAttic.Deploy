@@ -31,6 +31,11 @@ app.Configure(config =>
         .WithExample("app", "--slug", "streetsamurai", "--dry-run")
         .WithExample("app", "--all");
 
+    config.AddCommand<AllCommand>("all")
+        .WithDescription("Deploy every catalog page, root site, and app (non-interactive).")
+        .WithExample("all")
+        .WithExample("all", "--dry-run");
+
     config.AddCommand<ListCommand>("list")
         .WithDescription("Print every deploy target (catalog, sites, apps) with slugs + status.");
 
