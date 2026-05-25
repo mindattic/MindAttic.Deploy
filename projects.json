@@ -18,7 +18,8 @@
       "preDeploy": [
         { "kind": "uiux-pull",    "required": true },
         { "kind": "powershell",   "file": "../MindAttic.UiUx/sync/sync-streetsamurai.ps1", "required": true },
-        { "kind": "dotnet-build", "project": "../StreetSamurai/v3/StreetSamurai.Blazor/StreetSamurai.Blazor.csproj", "configuration": "Release", "required": true }
+        { "kind": "dotnet-build", "project": "../StreetSamurai/v3/StreetSamurai.Blazor/StreetSamurai.Blazor.csproj", "configuration": "Release", "required": true },
+        { "kind": "powershell",   "file": "../StreetSamurai/scripts/sync-audio-to-blob.ps1", "required": true }
       ]
     },
     {
@@ -71,6 +72,19 @@
       "stageOnly":     [],
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../Tutor/Tutor.Blazor/Tutor.Blazor.csproj", "configuration": "Release", "required": true }
+      ]
+    },
+    {
+      "slug":          "cursory",
+      "sourceDir":     "../Cursory",
+      "repo":          "mindattic/Cursory",
+      "branch":        "main",
+      "workflow":      "azure-deploy.yml",
+      "disabled":      true,
+      "disabledNote":  "Workflow targets `cursory` App Service at cursory.azurewebsites.net. Needs Azure infrastructure + AZURE_WEBAPP_PUBLISH_PROFILE secret in mindattic/Cursory. Set `disabled: false` once those exist.",
+      "stageOnly":     [],
+      "preDeploy": [
+        { "kind": "dotnet-build", "project": "../Cursory/Cursory.Blazor/Cursory.Blazor.csproj", "configuration": "Release", "required": true }
       ]
     }
   ],
