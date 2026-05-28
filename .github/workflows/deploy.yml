@@ -8,6 +8,8 @@ on:
       - 'template/**'
       - 'src/**'
       - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
     inputs:
       only:
@@ -47,10 +49,14 @@ jobs:
         env:
           MINDATTIC_FTP_JSON:      ${{ secrets.MINDATTIC_FTP_JSON }}
           SUBSCRIBER_REPO_TOKEN:   ${{ secrets.SUBSCRIBER_REPO_TOKEN }}
+          # Pass the dispatch input through the environment, never interpolate it
+          # directly into the shell — `${{ inputs.only }}` inline is a script-
+          # injection vector (a crafted slug would execute on the runner).
+          ONLY: ${{ inputs.only }}
         run: |
           themes="../MindAttic.UiUx/Themes"
-          if [ -n "${{ inputs.only }}" ]; then
-            npm run deploy -- --from-github --themes-root "$themes" --only "${{ inputs.only }}"
+          if [ -n "$ONLY" ]; then
+            npm run deploy -- --from-github --themes-root "$themes" --only "$ONLY"
           else
             npm run deploy -- --from-github --themes-root "$themes"
           fi

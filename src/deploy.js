@@ -145,6 +145,20 @@ const dryRun          = boolFlag('dry-run');
 const skipBuild       = boolFlag('skip-build');
 const includeDisabled = boolFlag('include-disabled');
 
+// Single FTPS connect path for both catalog and site mode. Validates the
+// server certificate by default; a legacy/self-signed host can opt out by
+// setting "rejectUnauthorized": false in secrets/ftp.json.
+function accessFtp(client, ftpCfg) {
+    return client.access({
+        host:     ftpCfg.host,
+        port:     ftpCfg.port || 21,
+        user:     ftpCfg.user,
+        password: ftpCfg.password,
+        secure:   ftpCfg.secure !== false,
+        secureOptions: { rejectUnauthorized: ftpCfg.rejectUnauthorized !== false },
+    });
+}
+
 function loadFtpSettings() {
     if (process.env.MINDATTIC_FTP_JSON) {
         try { return JSON.parse(process.env.MINDATTIC_FTP_JSON); }
@@ -184,7 +198,10 @@ function expandFiles(sourceDir, patterns) {
     const out = new Set();
     for (const pat of patterns) {
         if (pat.includes('*')) {
-            const re = new RegExp('^' + pat.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+            // Escape every regex metacharacter except `*`, then turn `*` into `.*`.
+            // (Previously only `.` was escaped, so a glob with e.g. `+` or `(` would
+            // be interpreted as a regex operator rather than a literal.)
+            const re = new RegExp('^' + pat.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
             all.filter((f) => re.test(f)).forEach((f) => out.add(f));
         } else if (fs.existsSync(path.join(sourceDir, pat))) {
             out.add(pat);
@@ -280,6 +297,9 @@ async function deployOneSite(client, site) {
 
     process.stdout.write(`\nSite: ${site.slug}  (${sourceDir} -> ${site.ftpRemotePath})${dryRun ? '  [DRY-RUN]' : ''}\n`);
 
+    if (dryRun && (site.preDeploy || []).length > 0) {
+        process.stdout.write(`  [dry-run] note: preDeploy hooks still RUN (git pull / build / sync scripts may mutate state); only the stamp + FTP upload are skipped.\n`);
+    }
     await executePreDeploy(site);
 
     const rawRemote = site.ftpRemotePath || '/';
@@ -349,6 +369,9 @@ async function deployOneApp(app) {
         return { fired: false, disabled: true };
     }
 
+    if (dryRun && (app.preDeploy || []).length > 0) {
+        process.stdout.write(`  [dry-run] note: preDeploy hooks still RUN (uiux-pull / dotnet build / sync scripts may mutate state or upload assets); only the git commit + push are skipped.\n`);
+    }
     await executePreDeploy(app);
 
     if (Array.isArray(app.stageOnly) && app.stageOnly.length > 0) {
@@ -442,7 +465,9 @@ async function uploadOne(client, project, ftpRemoteRoot) {
     const remoteRoot = ftpRemoteRoot.replace(/\/$/, '');
     const remoteFile = `${remoteRoot}/${project.slug}.htm`;
 
-    await client.ensureDir(remoteRoot);
+    // The caller runs ensureDir(remoteRoot) once before the loop, leaving the
+    // FTP working dir there, so each upload is just a relative put. (Previously
+    // ensureDir fired once per project — redundant since the root is shared.)
     await client.uploadFrom(localFile, `${project.slug}.htm`);
     const size = (await fsp.stat(localFile)).size;
     return { slug: project.slug, remoteFile, size };
@@ -473,14 +498,7 @@ async function runSiteMode(config) {
     const siteErrors = [];
     try {
         if (!dryRun) {
-            await client.access({
-                host:     ftpCfg.host,
-                port:     ftpCfg.port || 21,
-                user:     ftpCfg.user,
-                password: ftpCfg.password,
-                secure:   ftpCfg.secure !== false,
-                secureOptions: { rejectUnauthorized: false },
-            });
+            await accessFtp(client, ftpCfg);
         }
         for (const site of targets) {
             try {
@@ -538,14 +556,9 @@ async function runCatalogMode(config) {
 
     const failed = [];
     try {
-        await client.access({
-            host:     ftpCfg.host,
-            port:     ftpCfg.port || 21,
-            user:     ftpCfg.user,
-            password: ftpCfg.password,
-            secure:   ftpCfg.secure !== false,
-            secureOptions: { rejectUnauthorized: false },
-        });
+        await accessFtp(client, ftpCfg);
+        // All catalog pages share one remote root; navigate into it once.
+        await client.ensureDir(ftpRemoteRoot.replace(/\/$/, ''));
 
         for (const project of projects) {
             try {

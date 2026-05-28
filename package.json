@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node src/build.js",
     "deploy": "node src/deploy.js",
-    "all": "node src/deploy.js"
+    "all": "node src/deploy.js && node src/deploy.js --sites && node src/deploy.js --apps --include-disabled"
   },
   "dependencies": {
     "basic-ftp": "^5.0.5",

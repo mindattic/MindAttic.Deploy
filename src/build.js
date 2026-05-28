@@ -159,14 +159,20 @@ function htmlAttrEscape(s) {
     return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function fetchRaw(url, token) {
+const FETCH_TIMEOUT_MS = 15_000;
+const MAX_REDIRECTS    = 5;
+
+function fetchRaw(url, token, redirectsLeft = MAX_REDIRECTS) {
     return new Promise((resolve, reject) => {
         const headers = { 'User-Agent': 'MindAttic.Deploy/1.0' };
         if (token) headers['Authorization'] = 'token ' + token;
         const req = https.get(url, { headers }, (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
                 res.resume();
-                return fetchRaw(res.headers.location, token).then(resolve, reject);
+                if (redirectsLeft <= 0) {
+                    return reject(new Error(`Too many redirects (> ${MAX_REDIRECTS}) fetching ${url}`));
+                }
+                return fetchRaw(res.headers.location, token, redirectsLeft - 1).then(resolve, reject);
             }
             if (res.statusCode !== 200) {
                 res.resume();
@@ -176,6 +182,11 @@ function fetchRaw(url, token) {
             res.on('data', (c) => chunks.push(c));
             res.on('end',  () => resolve(Buffer.concat(chunks).toString('utf8')));
             res.on('error', reject);
+        });
+        // Without a timeout a hung GitHub connection wedges the whole build (and CI)
+        // indefinitely; destroy the socket and surface a clear error instead.
+        req.setTimeout(FETCH_TIMEOUT_MS, () => {
+            req.destroy(new Error(`Timeout (${FETCH_TIMEOUT_MS / 1000}s) fetching ${url}`));
         });
         req.on('error', reject);
     });

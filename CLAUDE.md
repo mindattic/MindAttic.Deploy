@@ -11,7 +11,7 @@
 ## Layout
 - `projects.json` -- canonical list of every landing page (slug, repo, title, tagline). Edit ONLY this to add/remove/retag a project.
 - `template/index.template.htm` -- the single canonical landing-page HTML. Uses `{{PLACEHOLDER}}` substitution and CDN-loaded MindAttic.UiUx.
-- `src/build.js` -- README -> out/&lt;slug&gt;/index.htm renderer (marked + highlight.js).
+- `src/build.js` -- README -> out/&lt;slug&gt;.htm renderer (marked + highlight.js).
 - `src/deploy.js` -- FTPS uploader (basic-ftp); runs build implicitly unless `--skip-build`.
 - `secrets/ftp.json` -- gitignored FTP credentials (template at `ftp.json.template`).
 - `out/` -- generated artifacts (gitignored).
@@ -25,7 +25,7 @@
 - **Per-project index.htm in the project's own repo**: should not exist after the migration. If you find one, it is a derived artifact; delete it.
 
 ## Commands
-- `npm run build` -- regenerate `out/<slug>/index.htm` for every catalog project.
+- `npm run build` -- regenerate `out/<slug>.htm` for every catalog project.
 - `npm run build -- --only mindatticvault` -- single catalog project.
 - `npm run build -- --from-github --ref main` -- force-fetch READMEs from GitHub (default reads from `D:\Projects\MindAttic\<repo>\README.md` if present).
 - `npm run deploy` -- build then FTPS upload every catalog project (does NOT touch `sites[]`).
