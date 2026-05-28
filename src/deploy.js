@@ -149,13 +149,21 @@ const includeDisabled = boolFlag('include-disabled');
 // server certificate by default; a legacy/self-signed host can opt out by
 // setting "rejectUnauthorized": false in secrets/ftp.json.
 function accessFtp(client, ftpCfg) {
+    const secureOptions = { rejectUnauthorized: ftpCfg.rejectUnauthorized !== false };
+    // When connecting by IP (or any host that won't appear in the server's
+    // cert), set "servername" in secrets/ftp.json to a hostname the cert
+    // actually covers. TLS then validates the (still fully-checked) cert chain
+    // and matches identity against that name via SNI, instead of the bare IP
+    // which can never be in a cert. For this GoDaddy shared host the cert SANs
+    // are *.prod.phx3.secureserver.net and prod.phx3.secureserver.net.
+    if (ftpCfg.servername) secureOptions.servername = ftpCfg.servername;
     return client.access({
         host:     ftpCfg.host,
         port:     ftpCfg.port || 21,
         user:     ftpCfg.user,
         password: ftpCfg.password,
         secure:   ftpCfg.secure !== false,
-        secureOptions: { rejectUnauthorized: ftpCfg.rejectUnauthorized !== false },
+        secureOptions,
     });
 }
 

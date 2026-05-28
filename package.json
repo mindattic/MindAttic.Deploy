@@ -5,8 +5,8 @@
   "description": "Single-source generator and FTPS deployer for every MindAttic site (catalog landing pages, subfolder guides, root sites).",
   "scripts": {
     "build": "node src/build.js",
-    "deploy": "node src/deploy.js",
-    "all": "node src/deploy.js && node src/deploy.js --sites && node src/deploy.js --apps --include-disabled"
+    "deploy": "node --use-system-ca src/deploy.js",
+    "all": "node --use-system-ca src/deploy.js && node --use-system-ca src/deploy.js --sites && node --use-system-ca src/deploy.js --apps --include-disabled"
   },
   "dependencies": {
     "basic-ftp": "^5.0.5",
