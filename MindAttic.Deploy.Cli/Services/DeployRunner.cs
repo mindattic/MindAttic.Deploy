@@ -65,9 +65,16 @@ public sealed class DeployRunner
             RedirectStandardOutput = false,
             RedirectStandardError = false,
         };
+        // Match package.json's `deploy`/`all` scripts: trust the OS certificate
+        // store. This box re-signs HTTPS via a TLS-interception proxy, so without
+        // --use-system-ca the FTPS connect + GitHub README fetch fail cert
+        // validation. `npm run deploy` passes this flag; the exe must too, or
+        // deploying through the published artifact (the primary launch path)
+        // breaks while `npm run deploy` works.
+        psi.ArgumentList.Add("--use-system-ca");
         foreach (var a in args) psi.ArgumentList.Add(a);
 
-        AnsiConsole.MarkupLine($"[grey]> node {string.Join(' ', args)}[/]");
+        AnsiConsole.MarkupLine($"[grey]> node --use-system-ca {string.Join(' ', args)}[/]");
         AnsiConsole.MarkupLine($"[grey]  cwd: {_repoRoot}[/]");
 
         try

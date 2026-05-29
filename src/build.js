@@ -118,12 +118,21 @@ function flagAll(name) {
     return out;
 }
 
-const onlySlugs     = flagAll('only');
-const refOverride   = stringFlag('ref');
-const forceGithub   = boolFlag('from-github');
-const siblingsRoot  = stringFlag('siblings-root') || path.resolve(repoRoot, '..');
-const themesRoot    = stringFlag('themes-root') || path.resolve(repoRoot, '..', 'MindAttic.UiUx', 'Themes');
-const componentsRef = stringFlag('components');
+// These parse argv and can throw on a malformed flag (e.g. `--only` with no
+// value). They run at module scope, outside main()'s catch, so wrap them here
+// to surface the clean `build.js: ...` error instead of a V8 stack trace.
+let onlySlugs, refOverride, forceGithub, siblingsRoot, themesRoot, componentsRef;
+try {
+    onlySlugs     = flagAll('only');
+    refOverride   = stringFlag('ref');
+    forceGithub   = boolFlag('from-github');
+    siblingsRoot  = stringFlag('siblings-root') || path.resolve(repoRoot, '..');
+    themesRoot    = stringFlag('themes-root') || path.resolve(repoRoot, '..', 'MindAttic.UiUx', 'Themes');
+    componentsRef = stringFlag('components');
+} catch (e) {
+    process.stderr.write(`build.js: ${e.message}\n`);
+    process.exit(2);
+}
 
 const CDN_BASE = 'https://cdn.jsdelivr.net/gh/mindattic/MindAttic.UiUx';
 
@@ -137,18 +146,28 @@ marked.setOptions({
     headerIds: true,
     mangle: false,
     highlight(code, lang) {
+        // highlightAuto was previously outside the try/catch — a throw from
+        // highlight.js (it can choke on pathological input) killed the whole
+        // build for that page. Keep it inside and fall back to escaped raw code
+        // so a single code block never fails the deploy.
         try {
             if (lang && hljs.getLanguage(lang)) {
                 return hljs.highlight(code, { language: lang }).value;
             }
-        } catch (_) {}
-        return hljs.highlightAuto(code).value;
+            return hljs.highlightAuto(code).value;
+        } catch (_) {
+            return htmlAttrEscape(code);
+        }
     },
 });
 
 const renderer = new marked.Renderer();
-renderer.heading = function (text, level, raw) {
-    const id = slugifyAnchor(raw);
+renderer.heading = function (text, level, raw, slugger) {
+    // Route our slug through marked's per-document slugger so repeated headings
+    // (e.g. two `## Usage`) get unique ids (usage, usage-1) instead of colliding
+    // — otherwise `#usage` only ever jumps to the first one. slugger is reset by
+    // marked on every parse() call, so ids never leak between projects.
+    const id = slugger ? slugger.slug(slugifyAnchor(raw)) : slugifyAnchor(raw);
     const anchor = level >= 2 && level <= 4
         ? ` <a class="heading-anchor" href="#${id}" aria-label="link to this section">#</a>`
         : '';
@@ -172,7 +191,12 @@ function fetchRaw(url, token, redirectsLeft = MAX_REDIRECTS) {
                 if (redirectsLeft <= 0) {
                     return reject(new Error(`Too many redirects (> ${MAX_REDIRECTS}) fetching ${url}`));
                 }
-                return fetchRaw(res.headers.location, token, redirectsLeft - 1).then(resolve, reject);
+                // Resolve a possibly-relative Location against the current URL, and
+                // drop the Authorization header if the redirect crosses to another
+                // host (GitHub raw redirects to its CDN) — never leak the token off-origin.
+                const next = new URL(res.headers.location, url);
+                const sameHost = next.host === new URL(url).host;
+                return fetchRaw(next.toString(), sameHost ? token : undefined, redirectsLeft - 1).then(resolve, reject);
             }
             if (res.statusCode !== 200) {
                 res.resume();

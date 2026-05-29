@@ -136,14 +136,23 @@ function flagAll(name) {
     return out;
 }
 
-const onlySlugs       = flagAll('only');
-const siteSlug        = stringFlag('site');
-const allSites        = boolFlag('sites');
-const appSlug         = stringFlag('app');
-const allApps         = boolFlag('apps');
-const dryRun          = boolFlag('dry-run');
-const skipBuild       = boolFlag('skip-build');
-const includeDisabled = boolFlag('include-disabled');
+// These parse argv and can throw on a malformed flag (e.g. `--site` with no
+// value). They run at module scope, outside main()'s catch, so wrap them here
+// to surface the clean `deploy.js: ...` error instead of a V8 stack trace.
+let onlySlugs, siteSlug, allSites, appSlug, allApps, dryRun, skipBuild, includeDisabled;
+try {
+    onlySlugs       = flagAll('only');
+    siteSlug        = stringFlag('site');
+    allSites        = boolFlag('sites');
+    appSlug         = stringFlag('app');
+    allApps         = boolFlag('apps');
+    dryRun          = boolFlag('dry-run');
+    skipBuild       = boolFlag('skip-build');
+    includeDisabled = boolFlag('include-disabled');
+} catch (e) {
+    process.stderr.write(`deploy.js: ${e.message}\n`);
+    process.exit(2);
+}
 
 // Single FTPS connect path for both catalog and site mode. Validates the
 // server certificate by default; a legacy/self-signed host can opt out by
@@ -190,7 +199,11 @@ function runBuild() {
             const v = stringFlag(name);
             if (v !== undefined) args.push('--' + name, v);
         }
-        const proc = child_process.spawn(process.execPath, args, { cwd: repoRoot, stdio: 'inherit' });
+        // Forward the parent's node flags (e.g. --use-system-ca, which the
+        // `deploy` npm script sets so TLS validates against the OS trust store
+        // behind this box's HTTPS-interception proxy). Without this the implicit
+        // build step's GitHub README fetch would silently lose the flag.
+        const proc = child_process.spawn(process.execPath, [...process.execArgv, ...args], { cwd: repoRoot, stdio: 'inherit' });
         proc.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`build.js exited ${code}`)));
         proc.on('error', reject);
     });
@@ -222,13 +235,17 @@ function stampIndex(absFile) {
     const date  = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
     const stamp = `<!-- Last Updated: ${date} -->`;
     let content = fs.readFileSync(absFile, 'utf8');
-    if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+    // Strip the BOM only so the ^ anchor matches, then restore it on write —
+    // otherwise every deploy silently rewrites a BOM-prefixed file without one.
+    const hadBom = content.charCodeAt(0) === 0xFEFF;
+    if (hadBom) content = content.slice(1);
     const re = /^(?:﻿?<!--\s*Last Updated:.*?-->(?:\r?\n))+/s;
     if (re.test(content)) {
         content = content.replace(re, `${stamp}\r\n`);
     } else {
         content = `${stamp}\r\n${content}`;
     }
+    if (hadBom) content = '﻿' + content;
     fs.writeFileSync(absFile, content, 'utf8');
     return date;
 }
@@ -261,6 +278,7 @@ function runPowershellHook(file, args) {
         ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', abs, ...resolvedArgs],
         { stdio: 'inherit' }
     );
+    if (r.error) throw new Error(`failed to launch powershell (is it on PATH?): ${r.error.message}`);
     return r.status;
 }
 
@@ -272,6 +290,7 @@ function runDotnetBuildHook(project, configuration) {
     const cfg = configuration || 'Release';
     process.stdout.write(`  [hook] dotnet build ${abs} -c ${cfg}\n`);
     const r = child_process.spawnSync('dotnet', ['build', abs, '-c', cfg, '--nologo'], { stdio: 'inherit' });
+    if (r.error) throw new Error(`failed to launch dotnet (is it on PATH?): ${r.error.message}`);
     return r.status;
 }
 
@@ -361,6 +380,7 @@ async function deployOneSite(client, site) {
 
 function gitSync(sourceDir, args, opts) {
     const r = child_process.spawnSync('git', ['-C', sourceDir, ...args], { stdio: opts?.capture ? 'pipe' : 'inherit', encoding: 'utf8' });
+    if (r.error) throw new Error(`failed to launch git (is it on PATH?): ${r.error.message}`);
     return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '' };
 }
 
@@ -397,7 +417,7 @@ async function deployOneApp(app) {
     if (hasStaged) {
         const msgTemplate = app.commitMessage || `Deploy via MindAttic.Deploy ({utc})`;
         const utc = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-        const msg = msgTemplate.replace('{utc}', utc);
+        const msg = msgTemplate.replace(/\{utc\}/g, utc);
         if (dryRun) {
             process.stdout.write(`  [git] (dry-run) commit -m "${msg}"\n`);
         } else {
