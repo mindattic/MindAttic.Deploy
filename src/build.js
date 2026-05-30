@@ -31,6 +31,7 @@ const path          = require('path');
 const https         = require('https');
 const { marked }    = require('marked');
 const hljs          = require('highlight.js');
+const parts         = require('./parts');
 
 const repoRoot      = path.resolve(__dirname, '..');
 const templatePath  = path.join(repoRoot, 'template', 'index.template.htm');
@@ -281,6 +282,13 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
     ]);
     const readmeHtml = marked.parse(md, { renderer }).trim();
 
+    // Optional parts-driven augmentation (gallery + configurator + live cost
+    // total + conditional blocks) for any project whose sibling repo carries a
+    // config/parts.json. No-op for everyone else. Source dir is the sibling
+    // checkout — same root we read the README from on the local fast path.
+    const sourceDir = path.join(siblingsRoot, project.repo);
+    const augmented = parts.augment({ sourceDir, slug: project.slug, html: readmeHtml });
+
     const openUrl = `https://mindattic.com/${project.slug}.htm`;
     const lastUpdated = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
@@ -296,7 +304,9 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
         THEME_LINKS:        theme.links,
         THEME_BODY_PRELUDE: theme.prelude,
         THEME_SCRIPTS:      theme.scripts,
-        README_HTML:        readmeHtml,
+        README_HTML:        augmented.html,
+        EXTRA_STYLE:        augmented.extraStyle,
+        EXTRA_SCRIPTS:      augmented.extraScripts,
         LAST_UPDATED:       lastUpdated,
     });
 

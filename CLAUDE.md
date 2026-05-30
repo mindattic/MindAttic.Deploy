@@ -12,6 +12,7 @@
 - `projects.json` -- canonical list of every landing page (slug, repo, title, tagline). Edit ONLY this to add/remove/retag a project.
 - `template/index.template.htm` -- the single canonical landing-page HTML. Uses `{{PLACEHOLDER}}` substitution and CDN-loaded MindAttic.UiUx.
 - `src/build.js` -- README -> out/&lt;slug&gt;.htm renderer (marked + highlight.js).
+- `src/parts.js` -- optional README augmentation: if a project's sibling repo has a `config/parts.json`, builds an interactive parts gallery + build configurator + live cost total + `<!-- when: ... -->` conditional blocks, injected via the template's `{{EXTRA_STYLE}}` / `{{EXTRA_SCRIPTS}}`. No-op for projects without `config/parts.json` (succeeds the retired per-project `build-html.js`; today: ChiMesh, Claudia).
 - `src/deploy.js` -- FTPS uploader (basic-ftp); runs build implicitly unless `--skip-build`.
 - `secrets/ftp.json` -- gitignored FTP credentials (template at `ftp.json.template`).
 - `out/` -- generated artifacts (gitignored).
