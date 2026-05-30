@@ -549,18 +549,28 @@ async function runSiteMode(config) {
 async function runCatalogMode(config) {
     const ftpRemoteRoot = config.ftpRemoteRoot || '/mindattic.com';
 
-    let projects = config.projects;
+    if (!skipBuild) await runBuild();
+
+    // Upload from the build manifest (curated + auto-discovered slugs that
+    // actually produced a page), falling back to config.projects if the build
+    // step was skipped and no manifest exists.
+    const manifestPath = path.join(outRoot, '_manifest.json');
+    let slugs;
+    if (fs.existsSync(manifestPath)) {
+        slugs = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } else {
+        slugs = (config.projects || []).map((p) => p.slug);
+    }
     if (onlySlugs.length > 0) {
-        const known = new Set(projects.map((p) => p.slug));
+        const known = new Set(slugs);
         const missing = onlySlugs.filter((s) => !known.has(s));
         if (missing.length > 0) {
             throw new Error(`Unknown catalog slug(s): ${missing.join(', ')}. Available: ${[...known].join(', ')}.`);
         }
         const wanted = new Set(onlySlugs);
-        projects = projects.filter((p) => wanted.has(p.slug));
+        slugs = slugs.filter((s) => wanted.has(s));
     }
-
-    if (!skipBuild) await runBuild();
+    let projects = slugs.map((slug) => ({ slug }));
 
     if (dryRun) {
         process.stdout.write(`\nDeploying ${projects.length} landing page(s)  [DRY-RUN -- no FTP connect, no uploads]\n`);

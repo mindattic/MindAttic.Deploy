@@ -34,6 +34,14 @@ const { marked }    = require('marked');
 const hljs          = require('highlight.js');
 const parts         = require('./parts');
 
+// Addon registry. An "addon" is an optional per-project interactive section
+// layered onto the standard README page, recorded as `"addon": "<name>"` on a
+// projects.json entry. Each addon module exports augment({sourceDir, slug,
+// html}) -> { html, extraStyle, extraScripts }. Today the only addon is
+// "parts" (the ChiMesh/Claudia build picker: gallery + configurator + live
+// cost total), which reads config/parts.json from the sibling repo checkout.
+const ADDONS = { parts };
+
 const repoRoot      = path.resolve(__dirname, '..');
 const templatePath  = path.join(repoRoot, 'template', 'index.template.htm');
 const projectsPath  = path.join(repoRoot, 'projects.json');
@@ -72,6 +80,7 @@ if (argv.includes('--help') || argv.includes('-h')) {
 // trigger a full build of every catalog project.
 const KNOWN_FLAGS = new Set([
     'only', 'ref', 'from-github', 'siblings-root', 'themes-root', 'components', 'help',
+    'no-discover',
 ]);
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -273,13 +282,26 @@ async function loadTheme(themeName, componentsVersion) {
 
     const cssPaths    = Array.isArray(deps.css)     ? deps.css     : [];
     const scriptPaths = Array.isArray(deps.scripts) ? deps.scripts : [];
+    const cbPaths     = Array.isArray(deps.circuitboard) ? deps.circuitboard : [];
 
     const themeCssUrl = `${CDN_BASE}@${componentsVersion}/Themes/${themeName}/theme.css`;
     const linkTags = [
         ...cssPaths.map((p) => `<link rel="stylesheet" href="${CDN_BASE}@${componentsVersion}/${p}">`),
         `<link rel="stylesheet" href="${themeCssUrl}">`,
     ].join('\n');
-    const scriptTags = scriptPaths
+
+    // Circuitboard parallax textures: console-bg.js reads
+    // window.__cyberspaceCircuitboardSrcs (if set) instead of the /api/media/*
+    // default that only exists behind StreetSamurai's MediaController. Emit a
+    // plain (non-defer) inline setter FIRST so it runs at parse time, before the
+    // deferred console-bg.js executes its top-level IIFE. jsDelivr URLs (pinned
+    // tag) rather than ~8 MB of base64 per page. Mirrors sync-mindattic-com.ps1.
+    const cbSetter = cbPaths.length
+        ? `<script>/* circuitboard parallax textures (jsDelivr @${componentsVersion}) */\nwindow.__cyberspaceCircuitboardSrcs=[${
+            cbPaths.map((p) => `"${CDN_BASE}@${componentsVersion}/${p}"`).join(',')
+          }];</script>\n`
+        : '';
+    const scriptTags = cbSetter + scriptPaths
         .map((p) => `<script src="${CDN_BASE}@${componentsVersion}/${p}" defer></script>`)
         .join('\n');
 
@@ -296,7 +318,7 @@ function substitute(template, vars) {
 }
 
 async function buildOne(project, template, defaultRef, defaultComponentsRef) {
-    const ref = refOverride || defaultRef;
+    const ref = refOverride || project.ref || defaultRef;
     const componentsVersion = componentsRef || defaultComponentsRef;
     const themeName = project.theme || 'Cyberspace';
 
@@ -306,12 +328,19 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
     ]);
     const readmeHtml = marked.parse(md, { renderer }).trim();
 
-    // Optional parts-driven augmentation (gallery + configurator + live cost
-    // total + conditional blocks) for any project whose sibling repo carries a
-    // config/parts.json. No-op for everyone else. Source dir is the sibling
-    // checkout — same root we read the README from on the local fast path.
+    // Addon augmentation: a project that records `"addon": "<name>"` gets that
+    // addon's interactive section layered onto the standard README page. The
+    // addon reads its data from the sibling repo checkout (sourceDir). Projects
+    // with no addon render the plain README. Today: "parts" (ChiMesh/Claudia).
     const sourceDir = path.join(siblingsRoot, project.repo);
-    const augmented = parts.augment({ sourceDir, slug: project.slug, html: readmeHtml });
+    let augmented = { html: readmeHtml, extraStyle: '', extraScripts: '' };
+    const addon = project.addon ? ADDONS[project.addon] : null;
+    if (project.addon && !addon) {
+        process.stderr.write(`  ! ${project.slug}: unknown addon "${project.addon}" — rendering plain README\n`);
+    }
+    if (addon) {
+        augmented = addon.augment({ sourceDir, slug: project.slug, html: readmeHtml });
+    }
 
     // "Open" button — only for projects with a real external app to visit
     // (e.g. an Azure-deployed Blazor app). Most landing pages have only the
@@ -356,13 +385,67 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
     return { slug: project.slug, theme: themeName, outFile, kb, source };
 }
 
+// Repos that are tooling/infra, not products — never auto-listed as landing
+// pages. Curated projects.json entries always win, so this only filters
+// auto-discovery.
+const DISCOVERY_EXCLUDE = new Set(['MindAttic.Deploy', 'MindAttic.UiUx']);
+
+function slugFromRepo(name) {
+    return String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// List every public, non-archived, non-fork repo in the mindattic org via the
+// GitHub CLI. Throws if `gh` is unavailable / unauthenticated; the caller
+// degrades to projects.json-only.
+function discoverPublicRepos() {
+    const out = execFileSync('gh', [
+        'repo', 'list', 'mindattic',
+        '--visibility', 'public', '--no-archived', '--source',
+        '--limit', '200',
+        '--json', 'name,description,defaultBranchRef',
+    ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return JSON.parse(out);
+}
+
+// Effective project list = curated projects.json entries (authoritative for
+// slug/title/tagline/openUrl/addon/theme) PLUS an auto-generated Cyberspace
+// entry for every other public repo, so "every public repo gets a landing
+// page" holds without hand-maintaining the list. Degrades to curated-only when
+// discovery fails (e.g. no gh in CI) or `--no-discover` is passed.
+function effectiveProjects(config) {
+    const curated = config.projects || [];
+    if (boolFlag('no-discover')) return curated;
+    let discovered;
+    try {
+        discovered = discoverPublicRepos();
+    } catch (e) {
+        process.stderr.write(`  ! repo discovery unavailable (${e.message.split('\n')[0]}); using projects.json only\n`);
+        return curated;
+    }
+    const curatedRepos = new Set(curated.map((p) => p.repo));
+    const extra = [];
+    for (const r of discovered) {
+        if (DISCOVERY_EXCLUDE.has(r.name) || curatedRepos.has(r.name)) continue;
+        extra.push({
+            slug:    slugFromRepo(r.name),
+            repo:    r.name,
+            title:   r.name,
+            tagline: r.description || '',
+            theme:   'Cyberspace',
+            ref:     (r.defaultBranchRef && r.defaultBranchRef.name) || undefined,
+        });
+    }
+    extra.sort((a, b) => a.slug.localeCompare(b.slug));
+    return [...curated, ...extra];
+}
+
 async function main() {
     const template = await fsp.readFile(templatePath, 'utf8');
     const config   = JSON.parse(await fsp.readFile(projectsPath, 'utf8'));
     const defaultRef           = 'main';
     const defaultComponentsRef = config.componentsVersion || 'main';
 
-    let projects = config.projects;
+    let projects = effectiveProjects(config);
     if (onlySlugs.length > 0) {
         const known = new Set(projects.map((p) => p.slug));
         const missing = onlySlugs.filter((s) => !known.has(s));
@@ -375,15 +458,32 @@ async function main() {
 
     process.stdout.write(`Building ${projects.length} landing page(s) -> ${outRoot}\n`);
     const failed = [];
+    const skipped = [];
+    const built = [];
     for (const project of projects) {
         try {
             const r = await buildOne(project, template, defaultRef, defaultComponentsRef);
+            built.push(r.slug);
             process.stdout.write(`  [ok]  ${r.slug.padEnd(18)} ${r.theme.padEnd(10)} ${r.kb.padStart(7)} KB  (README from ${r.source})\n`);
         } catch (e) {
-            failed.push({ slug: project.slug, error: e.message });
-            process.stdout.write(`  [FAIL] ${project.slug.padEnd(18)} ${e.message}\n`);
+            // A repo with no README.md on its default branch is skipped, not
+            // failed — auto-discovery sweeps in repos that may never have had
+            // one. Anything else is a real build failure.
+            if (/HTTP 404/.test(e.message)) {
+                skipped.push(project.slug);
+                process.stdout.write(`  [skip] ${project.slug.padEnd(18)} no README.md\n`);
+            } else {
+                failed.push({ slug: project.slug, error: e.message });
+                process.stdout.write(`  [FAIL] ${project.slug.padEnd(18)} ${e.message}\n`);
+            }
         }
     }
+    if (skipped.length) {
+        process.stdout.write(`\n${skipped.length} skipped (no README): ${skipped.join(', ')}\n`);
+    }
+    // Manifest of successfully built slugs, so deploy.js uploads exactly what
+    // was produced (curated + auto-discovered) rather than only config.projects.
+    await fsp.writeFile(path.join(outRoot, '_manifest.json'), JSON.stringify(built, null, 2) + '\n', 'utf8');
     if (failed.length) {
         process.stderr.write(`\n${failed.length} project(s) failed to build.\n`);
         process.exit(1);
