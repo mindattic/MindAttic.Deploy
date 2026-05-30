@@ -203,43 +203,6 @@ function readmeCommitDateIso(source) {
     }
 }
 
-// Build a left-rail table of contents from the rendered README. Extracting
-// from the HTML (rather than re-parsing the markdown) guarantees the anchor
-// ids match exactly what marked's slugger emitted, including dedup suffixes.
-// Lists H2 + H3; only renders when there are at least 3 H2 sections, so short
-// landing pages get no rail and keep the plain centered layout. Returns the
-// nav + hamburger markup, or '' to leave {{TOC}} empty.
-const TOC_MIN_H2 = 3;
-function buildToc(html) {
-    const re = /<h([23]) id="([^"]+)">([\s\S]*?)<\/h\1>/g;
-    const items = [];
-    let h2 = 0, m;
-    while ((m = re.exec(html)) !== null) {
-        const level = Number(m[1]);
-        const text = m[3]
-            .replace(/<a class="heading-anchor"[\s\S]*?<\/a>/g, '')
-            .replace(/<[^>]+>/g, '')
-            .trim();
-        if (!text) continue;
-        if (level === 2) h2++;
-        items.push({ level, id: m[2], text });
-    }
-    if (h2 < TOC_MIN_H2) return '';
-    const lis = items.map((it) =>
-        `<li class="lvl-${it.level}"><a href="#${it.id}">${it.text}</a></li>`
-    ).join('\n');
-    return `<button class="toc-toggle" type="button" aria-label="Open contents" aria-expanded="false" aria-controls="doc-toc">
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-</button>
-<div class="toc-backdrop"></div>
-<nav class="doc-toc" id="doc-toc" aria-label="Table of contents">
-  <div class="doc-toc-title">Contents</div>
-  <ol>
-${lis}
-  </ol>
-</nav>`;
-}
-
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS    = 5;
 
@@ -350,10 +313,6 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
     const sourceDir = path.join(siblingsRoot, project.repo);
     const augmented = parts.augment({ sourceDir, slug: project.slug, html: readmeHtml });
 
-    // TOC is built from the pre-augmentation HTML so the gallery's category
-    // headings (h3 #gallery-*) don't leak into the contents rail.
-    const toc = buildToc(readmeHtml);
-
     // "Open" button — only for projects with a real external app to visit
     // (e.g. an Azure-deployed Blazor app). Most landing pages have only the
     // GitHub button; an Open button that pointed back at the page itself was
@@ -384,7 +343,6 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
         THEME_SCRIPTS:      theme.scripts,
         README_HTML:        augmented.html,
         OPEN_BUTTON:        openButton,
-        TOC:                toc,
         EXTRA_STYLE:        augmented.extraStyle,
         EXTRA_SCRIPTS:      augmented.extraScripts,
         LAST_UPDATED:       lastUpdated,
