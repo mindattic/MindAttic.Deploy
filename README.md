@@ -22,7 +22,7 @@ Anything that ships via FTP. Today that's:
 | Array in `projects.json` | Examples | Remote |
 |---|---|---|
 | `projects[]` — catalog landing page (README -> `<slug>.htm`) | idiotproof, mindatticlegion, mindatticvault, taxratecollector, thinktank, tutor, mediabutler, gridgame2026, mindatticpsst | `/mindattic.com/<slug>.htm` |
-| `projects[]` — long-form build guide (same renderer, Hardware theme) | claudia, chimesh | `/mindattic.com/<slug>.htm` |
+| `projects[]` — long-form build guide (same renderer + Cyberspace theme, plus the parts-picker augmentation) | claudia, chimesh | `/mindattic.com/<slug>.htm` |
 | `sites[]` — verbatim root-site FTP upload | mindattic.com, mindatticcares.com, ryandebraal.com | site root |
 | `apps[]` — Blazor / GitHub-Actions deploys (CI does the actual push) | streetsamurai (enabled); idiotproof, taxratecollector, thinktank, tutor (stubbed pending Azure infra) | — |
 
@@ -66,7 +66,7 @@ Pick the right array in `projects.json`:
     "theme":   "Cyberspace"
   }
   ```
-  Then: `npm run deploy -- --only newproject`. (`theme` matches a folder name under `MindAttic.UiUx/Themes/` — today: `Cyberspace` for software projects, `Hardware` for hardware build guides.)
+  Then: `npm run deploy -- --only newproject`. (`theme` matches a folder name under `MindAttic.UiUx/Themes/` — today `Cyberspace` is the only theme; the Hardware doc theme was retired 2026-05-29.)
 
 - **Verbatim root site** (no template, files uploaded as-is): append to `sites[]` with `sourceDir`, `ftpRemotePath`, and `files[]`. Then: `npm run deploy -- --site <slug>`.
 

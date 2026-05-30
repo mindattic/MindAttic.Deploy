@@ -25,7 +25,7 @@ jobs:
         with:
           path: MindAttic.Deploy
 
-      # Themes (Cyberspace/Hardware CSS + body preludes + deps.json) live in
+      # Themes (Cyberspace CSS + body prelude + deps.json) live in
       # MindAttic.UiUx and are read off disk by src/build.js. Without this
       # sibling checkout, loadTheme() throws and no landing page renders.
       - uses: actions/checkout@v4

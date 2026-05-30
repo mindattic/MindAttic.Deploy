@@ -54,7 +54,7 @@ Every MindAttic project's `/deploy` slash command (slash or skill) now shims int
 Catalog landing pages for the 4 disabled-app projects are deployed centrally from MindAttic.Deploy (`npm run deploy -- --only <slug>`), NOT from each project's `/deploy`.
 
 ## Adding a new landing page
-1. Append a project block to `projects.json` (`slug`, `repo`, `title`, `tagline`, `theme`). Valid themes today: `Cyberspace` (default for software projects) or `Hardware` (Claudia, ChiMesh).
+1. Append a project block to `projects.json` (`slug`, `repo`, `title`, `tagline`, `theme`). Only theme today: `Cyberspace` (the Hardware doc theme was retired 2026-05-29; ChiMesh/Claudia now use Cyberspace + the parts-picker augmentation).
 2. `npm run deploy -- --only <slug>` -- builds and pushes only the new one.
 
 That is the entire procedure. No scaffold script, no per-project `scripts/cli/`, no marker blocks.

@@ -1,5 +1,5 @@
 {
-  "$comment": "Canonical registry for MindAttic.Deploy. Three arrays: `projects` is README-driven landing pages at mindattic.com/<slug>.htm (rendered via template/index.template.htm); `sites` is verbatim root-site FTP uploads (mindattic.com root, mindatticcares.com, ryandebraal.com); `apps` is Blazor / GitHub-Actions-driven deploys (StreetSamurai today; IdiotProof/TaxRateCollector/ThinkTank/Tutor stubbed pending infra). Build/Deploy = node src/build.js / src/deploy.js. componentsVersion pins the jsDelivr tag for MindAttic.UIUX (Components and Themes both come from this ref). 'main' = tip-of-tree (current default): live pages can shift when UiUx changes and jsDelivr caches 'main' for ~12h, so rollouts are not atomic. For production stability, pin an immutable tag — but it MUST contain the current Themes/<Theme>/{deps.json,theme.css} layout. NOTE: the existing 'v1.0.0' tag predates that layout (Themes/ and the Components/ rename are all post-v1.0.0), so pinning it would 404 every page's CSS. Cut a fresh tag from UiUx main first, then set it here. (Now pinned to 'v1.0.1', cut from UiUx main on 2026-05-28 — it contains the current Themes/ layout and the Cyberspace console-bg.js + circuitboard textures that mindattic.com loads from jsDelivr.) Each project picks a theme via the 'theme' field; valid values match folder names under MindAttic.UIUX/Themes/ (currently: Cyberspace, Hardware).",
+  "$comment": "Canonical registry for MindAttic.Deploy. Three arrays: `projects` is README-driven landing pages at mindattic.com/<slug>.htm (rendered via template/index.template.htm); `sites` is verbatim root-site FTP uploads (mindattic.com root, mindatticcares.com, ryandebraal.com); `apps` is Blazor / GitHub-Actions-driven deploys (StreetSamurai today; IdiotProof/TaxRateCollector/ThinkTank/Tutor stubbed pending infra). Build/Deploy = node src/build.js / src/deploy.js. componentsVersion pins the jsDelivr tag for MindAttic.UIUX (Components and Themes both come from this ref). 'main' = tip-of-tree (current default): live pages can shift when UiUx changes and jsDelivr caches 'main' for ~12h, so rollouts are not atomic. For production stability, pin an immutable tag — but it MUST contain the current Themes/<Theme>/{deps.json,theme.css} layout. NOTE: the existing 'v1.0.0' tag predates that layout (Themes/ and the Components/ rename are all post-v1.0.0), so pinning it would 404 every page's CSS. Cut a fresh tag from UiUx main first, then set it here. (Now pinned to 'v1.0.1', cut from UiUx main on 2026-05-28 — it contains the current Themes/ layout and the Cyberspace console-bg.js + circuitboard textures that mindattic.com loads from jsDelivr.) Each project picks a theme via the 'theme' field; valid values match folder names under MindAttic.UIUX/Themes/ (currently: Cyberspace — the sole theme; the Hardware doc theme was retired 2026-05-29 and ChiMesh/Claudia moved to Cyberspace).",
 
   "componentsVersion": "v1.0.1",
 
@@ -186,14 +186,14 @@
       "repo":    "Claudia",
       "title":   "Claudia",
       "tagline": "Build your own Claude-powered smart speaker in an afternoon. No soldering. No cloud lock-in.",
-      "theme":   "Hardware"
+      "theme":   "Cyberspace"
     },
     {
       "slug":    "chimesh",
       "repo":    "ChiMesh",
       "title":   "ChiMesh",
       "tagline": "Off-grid Chicago. A solar-powered LoRa mesh that runs without the internet, the grid, or anyone's permission.",
-      "theme":   "Hardware"
+      "theme":   "Cyberspace"
     }
   ]
 }
