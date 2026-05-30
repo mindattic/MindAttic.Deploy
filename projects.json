@@ -147,6 +147,13 @@
       "theme":   "Cyberspace"
     },
     {
+      "slug":    "mindatticconsole",
+      "repo":    "MindAttic.Console",
+      "title":   "MindAttic.Console",
+      "tagline": "C# CLI that orchestrates every MindAttic project — project menus, per-tab AI agent hosting, commit/push, and backup, all through Windows Terminal.",
+      "theme":   "Cyberspace"
+    },
+    {
       "slug":    "mindatticvault",
       "repo":    "MindAttic.Vault",
       "title":   "MindAttic.Vault",
