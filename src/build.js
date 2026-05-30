@@ -29,6 +29,7 @@ const fs            = require('fs');
 const fsp           = require('fs/promises');
 const path          = require('path');
 const https         = require('https');
+const { execFileSync } = require('child_process');
 const { marked }    = require('marked');
 const hljs          = require('highlight.js');
 const parts         = require('./parts');
@@ -177,6 +178,29 @@ renderer.heading = function (text, level, raw, slugger) {
 
 function htmlAttrEscape(s) {
     return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// "Last updated" = the README's last git commit date, as ISO-8601 UTC. `source`
+// is what loadReadme resolved: a local file path (dev box / CI sibling) or a
+// raw GitHub URL. Returns null when the date can't be determined — a raw fetch
+// carries no commit metadata, or git isn't available / the dir isn't a repo —
+// so the caller falls back to build time. Reflects the last COMMIT, so
+// uncommitted edits to README.md won't move the stamp until committed.
+function readmeCommitDateIso(source) {
+    if (/^https?:/i.test(source)) return null;
+    try {
+        const dir = path.dirname(source);
+        const out = execFileSync(
+            'git', ['-C', dir, 'log', '-1', '--format=%cI', '--', 'README.md'],
+            { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+        ).trim();
+        if (!out) return null;
+        const d = new Date(out);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+    } catch (_) {
+        return null;
+    }
 }
 
 // Build a left-rail table of contents from the rendered README. Extracting
@@ -330,7 +354,22 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
     // headings (h3 #gallery-*) don't leak into the contents rail.
     const toc = buildToc(readmeHtml);
 
-    const lastUpdated = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    // "Open" button — only for projects with a real external app to visit
+    // (e.g. an Azure-deployed Blazor app). Most landing pages have only the
+    // GitHub button; an Open button that pointed back at the page itself was
+    // pure redundancy, so it appears solely when `openUrl` is set.
+    const openButton = project.openUrl
+        ? `<a class="btn btn-primary" href="${htmlAttrEscape(project.openUrl)}" target="_blank" rel="noopener noreferrer">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Open
+            </a>
+            `
+        : '';
+
+    // Prefer the README's last git commit date; fall back to build time when
+    // it can't be resolved (raw-URL source, or no git / not a repo).
+    const lastUpdated = readmeCommitDateIso(source)
+        || new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
     const html = substitute(template, {
         TITLE:              project.title,
@@ -344,6 +383,7 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
         THEME_BODY_PRELUDE: theme.prelude,
         THEME_SCRIPTS:      theme.scripts,
         README_HTML:        augmented.html,
+        OPEN_BUTTON:        openButton,
         TOC:                toc,
         EXTRA_STYLE:        augmented.extraStyle,
         EXTRA_SCRIPTS:      augmented.extraScripts,

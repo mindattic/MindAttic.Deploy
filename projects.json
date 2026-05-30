@@ -194,6 +194,22 @@
       "title":   "ChiMesh",
       "tagline": "Off-grid Chicago. A solar-powered LoRa mesh that runs without the internet, the grid, or anyone's permission.",
       "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "streetsamurai",
+      "repo":    "StreetSamurai",
+      "title":   "StreetSamurai",
+      "tagline": "A literary fiction engine for a cyberpunk century.",
+      "theme":   "Cyberspace",
+      "openUrl": "https://streetsamurai.azurewebsites.net/"
+    },
+    {
+      "slug":    "cursory",
+      "repo":    "Cursory",
+      "title":   "Cursory",
+      "tagline": "Cooperative cursor puzzles in a shared room.",
+      "theme":   "Cyberspace",
+      "openUrl": "https://cursory.azurewebsites.net/"
     }
   ]
 }
