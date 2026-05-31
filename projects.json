@@ -219,6 +219,13 @@
       "tagline": "Cooperative cursor puzzles in a shared room.",
       "theme":   "Cyberspace",
       "openUrl": "https://cursory.azurewebsites.net/"
+    },
+    {
+      "slug":    "mindatticuiux",
+      "repo":    "MindAttic.UiUx",
+      "title":   "MindAttic.UiUx",
+      "tagline": "Shared front-end library — the Cyberspace look (animated console-background effects, fonts, scan-line overlays) inlined into every MindAttic site and app via jsDelivr and PowerShell sync. No build step.",
+      "theme":   "Cyberspace"
     }
   ]
 }

@@ -360,8 +360,12 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
         || new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
     const html = substitute(template, {
-        TITLE:              project.title,
-        TAGLINE:            project.tagline,
+        // TITLE/TAGLINE land in HTML text nodes (<title>, <h1>, <p>). Escape them:
+        // auto-discovered entries take their tagline verbatim from a repo's GitHub
+        // description, which is arbitrary text and may contain &, <, > or quotes
+        // that would otherwise corrupt the markup (or inject) on the rendered page.
+        TITLE:              htmlAttrEscape(project.title),
+        TAGLINE:            htmlAttrEscape(project.tagline),
         TAGLINE_ATTR:       htmlAttrEscape(project.tagline),
         SLUG:               project.slug,
         REPO:               project.repo,
@@ -387,8 +391,9 @@ async function buildOne(project, template, defaultRef, defaultComponentsRef) {
 
 // Repos that are tooling/infra, not products — never auto-listed as landing
 // pages. Curated projects.json entries always win, so this only filters
-// auto-discovery.
-const DISCOVERY_EXCLUDE = new Set(['MindAttic.Deploy', 'MindAttic.UiUx']);
+// auto-discovery. (MindAttic.UiUx now ships a curated landing page, so only
+// the deploy tool itself stays excluded.)
+const DISCOVERY_EXCLUDE = new Set(['MindAttic.Deploy']);
 
 function slugFromRepo(name) {
     return String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -423,11 +428,22 @@ function effectiveProjects(config) {
         return curated;
     }
     const curatedRepos = new Set(curated.map((p) => p.repo));
+    // Slugs already claimed by curated entries — and any we mint below — so a
+    // discovered repo whose name slugifies to an existing slug (e.g. `MindAttic.Psst`
+    // -> mindatticpsst already curated, or two repos that collapse to the same
+    // slug) can't overwrite that page's out/<slug>.htm. Curated always wins.
+    const takenSlugs = new Set(curated.map((p) => p.slug));
     const extra = [];
     for (const r of discovered) {
         if (DISCOVERY_EXCLUDE.has(r.name) || curatedRepos.has(r.name)) continue;
+        const slug = slugFromRepo(r.name);
+        if (takenSlugs.has(slug)) {
+            process.stderr.write(`  ! discovered repo ${r.name} slugifies to '${slug}', already claimed — skipping to avoid clobbering\n`);
+            continue;
+        }
+        takenSlugs.add(slug);
         extra.push({
-            slug:    slugFromRepo(r.name),
+            slug,
             repo:    r.name,
             title:   r.name,
             tagline: r.description || '',
