@@ -85,6 +85,18 @@
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../Cursory/Cursory.Blazor/Cursory.Blazor.csproj", "configuration": "Release", "required": true }
       ]
+    },
+    {
+      "slug":          "personagallery",
+      "sourceDir":     "../PersonaGallery",
+      "repo":          "mindattic/PersonaGallery",
+      "branch":        "main",
+      "workflow":      "azure-deploy.yml",
+      "disabled":      true,
+      "stageOnly":     [],
+      "preDeploy": [
+        { "kind": "dotnet-build", "project": "../PersonaGallery/PersonaGallery.Blazor/PersonaGallery.Blazor.csproj", "configuration": "Release", "required": true }
+      ]
     }
   ],
 
@@ -219,6 +231,21 @@
       "tagline": "Cooperative cursor puzzles in a shared room.",
       "theme":   "Cyberspace",
       "openUrl": "https://cursory.azurewebsites.net/"
+    },
+    {
+      "slug":    "mindattichelpers",
+      "repo":    "MindAttic.Helpers",
+      "title":   "MindAttic.Helpers",
+      "tagline": "Dependency-free .NET helpers — including a deterministic abstract-art generator that turns any string into a stable SVG fingerprint.",
+      "theme":   "Cyberspace"
+    },
+    {
+      "slug":    "personagallery",
+      "repo":    "PersonaGallery",
+      "title":   "Persona Gallery",
+      "tagline": "Browse MindAttic.Legion's 1024 psychometrically-scored personas — each an individual with a generated abstract-art portrait.",
+      "theme":   "Cyberspace",
+      "openUrl": "https://personagallery.azurewebsites.net/"
     },
     {
       "slug":    "mindatticuiux",
