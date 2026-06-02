@@ -92,7 +92,7 @@
       "repo":          "mindattic/MindAttic.Legion.PersonaGallery",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
-      "disabled":      true,
+      "disabled":      false,
       "stageOnly":     [],
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../MindAttic.Legion.PersonaGallery/PersonaGallery.Blazor/PersonaGallery.Blazor.csproj", "configuration": "Release", "required": true }
