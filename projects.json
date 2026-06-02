@@ -88,14 +88,14 @@
     },
     {
       "slug":          "personagallery",
-      "sourceDir":     "../PersonaGallery",
-      "repo":          "mindattic/PersonaGallery",
+      "sourceDir":     "../MindAttic.Legion.PersonaGallery",
+      "repo":          "mindattic/MindAttic.Legion.PersonaGallery",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
       "disabled":      true,
       "stageOnly":     [],
       "preDeploy": [
-        { "kind": "dotnet-build", "project": "../PersonaGallery/PersonaGallery.Blazor/PersonaGallery.Blazor.csproj", "configuration": "Release", "required": true }
+        { "kind": "dotnet-build", "project": "../MindAttic.Legion.PersonaGallery/PersonaGallery.Blazor/PersonaGallery.Blazor.csproj", "configuration": "Release", "required": true }
       ]
     }
   ],
@@ -241,7 +241,7 @@
     },
     {
       "slug":    "personagallery",
-      "repo":    "PersonaGallery",
+      "repo":    "MindAttic.Legion.PersonaGallery",
       "title":   "Persona Gallery",
       "tagline": "Browse MindAttic.Legion's 1024 psychometrically-scored personas — each an individual with a generated abstract-art portrait.",
       "theme":   "Cyberspace",
