@@ -1,7 +1,7 @@
 {
-  "$comment": "Canonical registry for MindAttic.Deploy. Three arrays: `projects` is README-driven landing pages at mindattic.com/<slug>.htm (rendered via template/index.template.htm); `sites` is verbatim root-site FTP uploads (mindattic.com root, mindatticcares.com, ryandebraal.com); `apps` is Blazor / GitHub-Actions-driven deploys (StreetSamurai today; IdiotProof/TaxRateCollector/ThinkTank/Tutor stubbed pending infra). Build/Deploy = node src/build.js / src/deploy.js. componentsVersion pins the jsDelivr tag for MindAttic.UIUX (Components and Themes both come from this ref). 'main' = tip-of-tree (current default): live pages can shift when UiUx changes and jsDelivr caches 'main' for ~12h, so rollouts are not atomic. For production stability, pin an immutable tag — but it MUST contain the current Themes/<Theme>/{deps.json,theme.css} layout. NOTE: the existing 'v1.0.0' tag predates that layout (Themes/ and the Components/ rename are all post-v1.0.0), so pinning it would 404 every page's CSS. Cut a fresh tag from UiUx main first, then set it here. (Pinned to 'v1.1.0' — this tag MUST be cut from UiUx main first; it contains the current Themes/ layout, the Cyberspace console-bg.js + circuitboard textures, and the new SacredGeometry component (sacred-geometry.js + previews/) that the Cyberspace SCHEMATIC effect and the Legion persona gallery load from jsDelivr. The prior pin was 'v1.0.1', cut 2026-05-28.) Each project picks a theme via the 'theme' field; valid values match folder names under MindAttic.UIUX/Themes/ (currently: Cyberspace — the sole theme; the Hardware doc theme was retired 2026-05-29 and ChiMesh/Claudia moved to Cyberspace). AUTO-DISCOVERY: build.js also auto-generates a Cyberspace landing page for EVERY public non-archived mindattic repo with a README (via `gh repo list`), excluding infra (MindAttic.Deploy, MindAttic.UiUx) and repos with no README. The `projects` entries below are the CURATED overrides (title/tagline/openUrl/addon); discovered repos not listed here get title=repo, tagline=GitHub description. Pass --no-discover to build only the curated list. ADDONS: an entry may set 'addon' (e.g. \"parts\") to layer an interactive section onto the standard README page — today only \"parts\" (ChiMesh/Claudia build picker), driven by src/parts.js reading the repo's config/parts.json.",
+  "$comment": "Canonical registry for MindAttic.Deploy. Three arrays: `projects` is README-driven landing pages at mindattic.com/<slug>.htm (rendered via template/index.template.htm); `sites` is verbatim root-site FTP uploads (mindattic.com root, mindatticcares.com, ryandebraal.com); `apps` is Blazor / GitHub-Actions-driven deploys (StreetSamurai today; IdiotProof/TaxRateCollector/ThinkTank/Tutor stubbed pending infra). Build/Deploy = node src/build.js / src/deploy.js. componentsVersion pins the jsDelivr tag for MindAttic.UIUX (Components and Themes both come from this ref). 'main' = tip-of-tree: live pages can shift when UiUx changes and jsDelivr caches 'main' for ~12h, so rollouts are not atomic. For production stability, pin an immutable whole-number tag (per the MindAttic.Ideas A1 rule — whole numbers only, no SemVer: V1, V2, V3, …, never v1.1.1) — but the tag MUST contain the current Themes/<Theme>/{deps.json,theme.css} layout. (Pinned to 'V4' — SacredGeometry with the harmonograph shapes removed (still exactly 1024 shapes; freed slots redistributed across the other families): current Themes/ layout, Cyberspace console-bg.js + circuitboard textures, and the SacredGeometry component (sacred-geometry.js + previews/) that the Cyberspace SCHEMATIC effect and the Legion persona gallery load from jsDelivr. UiUx tags were renumbered 2026-06-04 from SemVer to whole numbers: v1.0.0→V1, v1.0.1→V2, v1.1.0→V3, then V4 added for the harmonograph removal; the next UiUx release is V5.) Each project picks a theme via the 'theme' field; valid values match folder names under MindAttic.UIUX/Themes/ (currently: Cyberspace — the sole theme; the Hardware doc theme was retired 2026-05-29 and ChiMesh/Claudia moved to Cyberspace). AUTO-DISCOVERY: build.js also auto-generates a Cyberspace landing page for EVERY public non-archived mindattic repo with a README (via `gh repo list`), excluding infra (MindAttic.Deploy, MindAttic.UiUx) and repos with no README. The `projects` entries below are the CURATED overrides (title/tagline/openUrl/addon); discovered repos not listed here get title=repo, tagline=GitHub description. Pass --no-discover to build only the curated list. ADDONS: an entry may set 'addon' (e.g. \"parts\") to layer an interactive section onto the standard README page — today only \"parts\" (ChiMesh/Claudia build picker), driven by src/parts.js reading the repo's config/parts.json.",
 
-  "componentsVersion": "v1.1.0",
+  "componentsVersion": "V4",
 
   "ftpRemoteRoot": "/mindattic.com",
 
@@ -100,15 +100,15 @@
     },
     {
       "slug":          "mindatticfrontend",
-      "sourceDir":     "../MindAttic.Frontend",
-      "repo":          "mindattic/MindAttic.Frontend",
+      "sourceDir":     "../MindAttic.Frontpage",
+      "repo":          "mindattic/MindAttic.Frontpage",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
       "disabled":      true,
       "disabledNote":  "Needs Azure App Service `mindatticfrontend` + Azure SQL + app settings ConnectionStrings__Frontend (and Frontend__AdminPassword) + AZURE_WEBAPP_PUBLISH_PROFILE. Set disabled:false once provisioned.",
       "stageOnly":     [],
       "preDeploy": [
-        { "kind": "dotnet-build", "project": "../MindAttic.Frontend/MindAttic.Frontend.Blazor/MindAttic.Frontend.Blazor.csproj", "configuration": "Release", "required": true }
+        { "kind": "dotnet-build", "project": "../MindAttic.Frontpage/MindAttic.Frontpage.Blazor/MindAttic.Frontpage.Blazor.csproj", "configuration": "Release", "required": true }
       ]
     }
   ],
@@ -269,8 +269,8 @@
     },
     {
       "slug":    "mindatticfrontend",
-      "repo":    "MindAttic.Frontend",
-      "title":   "MindAttic.Frontend",
+      "repo":    "MindAttic.Frontpage",
+      "title":   "MindAttic.Frontpage",
       "tagline": "Strongly-typed Blazor Server CMS for the MindAttic corporation — EF + SQL, slug-routed landing pages, admin UI.",
       "theme":   "Cyberspace"
     }
