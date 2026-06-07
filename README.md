@@ -100,7 +100,7 @@ Lookup order in `deploy.js`: `MINDATTIC_FTP_JSON` env -> APPDATA Vault file -> l
 
 ## Component versioning
 
-`projects.json -> componentsVersion` pins the jsDelivr ref for MindAttic.UiUx (both `Components/` and `Themes/` come from this ref). Use `"main"` for tip-of-tree, or a tag like `"v1.0.0"` for immutable cache hits in production. Bumping this is how a font or Cyberspace-effect change propagates to every catalog landing page on the next deploy.
+`projects.json -> componentsVersion` pins the jsDelivr ref for MindAttic.UiUx (both `Components/` and `Themes/` come from this ref). Use `"main"` for tip-of-tree, or a whole-number tag like `"V3"` for immutable cache hits in production (per the MindAttic.Ideas A1 rule — whole numbers only, no SemVer: `V1`, `V2`, `V3`, …, never `v1.1.1`). Bumping this is how a font or Cyberspace-effect change propagates to every catalog landing page on the next deploy.
 
 ---
 

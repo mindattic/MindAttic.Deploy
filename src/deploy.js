@@ -239,7 +239,11 @@ function stampIndex(absFile) {
     // otherwise every deploy silently rewrites a BOM-prefixed file without one.
     const hadBom = content.charCodeAt(0) === 0xFEFF;
     if (hadBom) content = content.slice(1);
-    const re = /^(?:﻿?<!--\s*Last Updated:.*?-->(?:\r?\n))+/s;
+    // Each stamp comment is normally followed by a newline; allow end-of-string
+    // too so a file that ends exactly at the comment (no trailing newline) still
+    // matches and gets replaced, instead of accumulating an orphan stamp below
+    // the fresh one on the next deploy.
+    const re = /^(?:﻿?<!--\s*Last Updated:.*?-->(?:\r?\n|$))+/s;
     if (re.test(content)) {
         content = content.replace(re, `${stamp}\r\n`);
     } else {

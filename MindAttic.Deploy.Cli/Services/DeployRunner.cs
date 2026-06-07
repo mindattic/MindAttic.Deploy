@@ -74,8 +74,11 @@ public sealed class DeployRunner
         psi.ArgumentList.Add("--use-system-ca");
         foreach (var a in args) psi.ArgumentList.Add(a);
 
-        AnsiConsole.MarkupLine($"[grey]> node --use-system-ca {string.Join(' ', args)}[/]");
-        AnsiConsole.MarkupLine($"[grey]  cwd: {_repoRoot}[/]");
+        // Escape the joined args / repo path: a forwarded value (a --ref, or a
+        // --siblings-root/--themes-root path) can contain '[', which AnsiConsole
+        // would parse as a markup tag and throw on, aborting before node runs.
+        AnsiConsole.MarkupLine($"[grey]> node --use-system-ca {Markup.Escape(string.Join(' ', args))}[/]");
+        AnsiConsole.MarkupLine($"[grey]  cwd: {Markup.Escape(_repoRoot)}[/]");
 
         try
         {

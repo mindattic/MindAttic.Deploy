@@ -62,7 +62,7 @@ public sealed class MainMenuCommand : Command
         if (catalogPicks.Count > 0)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule($"[cyan]catalog: {string.Join(", ", catalogPicks)}[/]").LeftJustified());
+            AnsiConsole.Write(new Rule($"[cyan]catalog: {Markup.Escape(string.Join(", ", catalogPicks))}[/]").LeftJustified());
             // One node invocation builds all selected slugs once, then uploads each.
             int code = runner.RunCatalog(catalogPicks, skipBuild: false, dryRun: false);
             if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
@@ -82,7 +82,7 @@ public sealed class MainMenuCommand : Command
                 foreach (var slug in sitePicks)
                 {
                     AnsiConsole.WriteLine();
-                    AnsiConsole.Write(new Rule($"[cyan]site: {slug}[/]").LeftJustified());
+                    AnsiConsole.Write(new Rule($"[cyan]site: {Markup.Escape(slug)}[/]").LeftJustified());
                     int code = runner.RunSite(slug, all: false, dryRun: false);
                     if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
                 }
@@ -107,7 +107,7 @@ public sealed class MainMenuCommand : Command
                 foreach (var slug in appPicks)
                 {
                     AnsiConsole.WriteLine();
-                    AnsiConsole.Write(new Rule($"[cyan]app: {slug}[/]").LeftJustified());
+                    AnsiConsole.Write(new Rule($"[cyan]app: {Markup.Escape(slug)}[/]").LeftJustified());
                     int code = runner.RunApp(slug, all: false, dryRun: false, includeDisabled: false);
                     if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
                 }

@@ -95,14 +95,24 @@ function partWhenAttrs(part) {
 function categoryWhenAttrs(parts) {
     if (!parts || !parts.length) return '';
     if (parts.some((p) => !p.when || !Object.keys(p.when).length)) return '';
+    // The page hides the category only when EVERY one of its data-when-* fails to
+    // match (logical AND across the emitted attrs). So we may only emit an attr
+    // for a key that EVERY part constrains — otherwise a key contributed by just
+    // some parts could hide the whole category while the parts that don't depend
+    // on that key are still individually visible. Intersect the key sets, then
+    // union the allowed values per surviving key.
+    const sharedKeys = parts
+        .map((p) => Object.keys(p.when))
+        .reduce((acc, keys) => acc.filter((k) => keys.includes(k)));
+    if (!sharedKeys.length) return '';
     const byKey = {};
-    for (const p of parts) {
-        for (const key of Object.keys(p.when)) {
-            byKey[key] = byKey[key] || new Set();
+    for (const key of sharedKeys) {
+        byKey[key] = new Set();
+        for (const p of parts) {
             String(p.when[key]).split(',').map((s) => s.trim()).filter(Boolean).forEach((v) => byKey[key].add(v));
         }
     }
-    return Object.keys(byKey).map((k) =>
+    return sharedKeys.map((k) =>
         ` data-when-${k}="${escapeHtml([...byKey[k]].join(','))}"`
     ).join('');
 }
@@ -210,9 +220,13 @@ function buildGallery(parts, configDir) {
             if (p.searchFor) {
                 linkRows.push(`<a class="part-link" href="${escapeHtml(p.searchFor)}" target="_blank" rel="noopener noreferrer">Google</a>`);
             }
-            reputableTiers.forEach((t, i) => {
+            let reputableShown = 0;
+            reputableTiers.forEach((t) => {
                 if (t.url) {
-                    linkRows.push(`<a class="part-link" href="${escapeHtml(t.url)}" target="_blank" rel="noopener noreferrer">Reputable #${i + 1}</a>`);
+                    // Number by rendered position, not array index, so a tier with
+                    // no url doesn't leave a gap (e.g. "#1, #3" with no "#2").
+                    reputableShown += 1;
+                    linkRows.push(`<a class="part-link" href="${escapeHtml(t.url)}" target="_blank" rel="noopener noreferrer">Reputable #${reputableShown}</a>`);
                 }
             });
             const linksHtml = linkRows.length
@@ -419,12 +433,18 @@ function buildConfigScript(axesJson, savedKey) {
       var cards = document.querySelectorAll('.part-card[data-price]'), sum = 0;
       for (var m = 0; m < cards.length; m++) {
         var c = cards[m];
-        if (c.hasAttribute('hidden')) continue;
+        // closest('[hidden]') catches the card AND any hidden ancestor (e.g. a
+        // whole parts-category hidden by config): a card can have its own when
+        // satisfied yet sit inside a category the union-of-whens hid, in which
+        // case it is not on screen and must not inflate the total.
+        if (c.closest('[hidden]')) continue;
         if (c.getAttribute('data-in-total') === 'false') continue;
         var v = parseFloat(c.getAttribute('data-price'));
         if (!isNaN(v)) sum += v;
       }
-      totalEl.textContent = '~$' + sum;
+      // Round to cents so non-integer prices don't surface binary-float noise
+      // (e.g. 0.1 + 0.2 -> "0.30000000000000004") in the displayed total.
+      totalEl.textContent = '~$' + (Math.round(sum * 100) / 100);
     }
   }
   function hydrate(cfg) {

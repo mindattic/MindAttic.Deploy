@@ -23,7 +23,7 @@ public sealed class ListCommand : Command
                 .AddColumn("repo")
                 .AddColumn("theme");
             foreach (var p in cfg.Projects)
-                t.AddRow(p.Slug, p.Repo, p.Theme ?? "");
+                t.AddRow(Markup.Escape(p.Slug), Markup.Escape(p.Repo), Markup.Escape(p.Theme ?? ""));
             AnsiConsole.Write(t);
         }
 
@@ -36,7 +36,7 @@ public sealed class ListCommand : Command
                 .AddColumn("sourceDir")
                 .AddColumn("remote");
             foreach (var s in cfg.Sites)
-                t.AddRow(s.Slug, s.SourceDir, s.FtpRemotePath);
+                t.AddRow(Markup.Escape(s.Slug), Markup.Escape(s.SourceDir), Markup.Escape(s.FtpRemotePath));
             AnsiConsole.Write(t);
         }
 
@@ -54,7 +54,8 @@ public sealed class ListCommand : Command
             foreach (var a in cfg.Apps)
             {
                 var status = a.Disabled ? "[red]disabled[/]" : "[green]enabled[/]";
-                t.AddRow(a.Slug, a.Repo, a.Branch, a.Workflow, status);
+                // status is intentional markup; the rest is config data -> escape.
+                t.AddRow(Markup.Escape(a.Slug), Markup.Escape(a.Repo), Markup.Escape(a.Branch), Markup.Escape(a.Workflow), status);
             }
             AnsiConsole.Write(t);
         }
