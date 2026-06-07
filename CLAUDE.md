@@ -56,7 +56,7 @@ How to work:
 - The per-site `deploy.ps1` / `deploy.bat` / `settings.json` in each root-site repo are dead after migration -- credentials come from MindAttic.Deploy's central `secrets/ftp.json`.
 
 ## Apps (`projects.json/apps[]`)
-- GitHub-Actions-driven deploys. Currently 5 entries: StreetSamurai (enabled, ships to Azure App Service via push-to-master) + IdiotProof / TaxRateCollector / ThinkTank / Tutor (all `disabled: true` pending Azure infra + `AZURE_WEBAPP_PUBLISH_PROFILE` secret).
+- GitHub-Actions-driven deploys. Currently 8 entries: StreetSamurai, Cursory, PersonaGallery (all enabled, ship to Azure App Service via push-to-branch) + IdiotProof / TaxRateCollector / ThinkTank / Tutor / MindAttic.Frontpage (all `disabled: true` pending Azure infra + `AZURE_WEBAPP_PUBLISH_PROFILE` secret).
 - Each entry: `slug`, `sourceDir`, `repo` (owner/name), `branch`, `workflow` (file name in `.github/workflows/`), `disabled` (bool), `disabledNote` (string), `stageOnly` (paths to `git add` before commit; empty = nothing to stage), `commitMessage` (template, `{utc}` is substituted), `preDeploy[]`.
 - preDeploy hook kinds: `uiux-pull`, `powershell`, `dotnet-build` (runs `dotnet build <project> -c <configuration> --nologo`; non-zero exit fails the deploy unless `required: false`).
 - Disabled apps: `--app <slug>` prints the `disabledNote` and exits 0. To enable, set `disabled: false`.

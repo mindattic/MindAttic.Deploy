@@ -57,7 +57,7 @@ One pipeline that builds and FTPS-deploys every MindAttic web property — READM
 ```
 
 ### 4.1 Projects / components
-- **`MindAttic.Deploy.Cli/`** — C# console app (`net10.0`, Spectre.Console.Cli, assembly name `MindAttic.Deploy`). A thin front door that shells into the node pipeline (see [`Services/DeployRunner.cs`](../MindAttic.Deploy.Cli/Services/DeployRunner.cs)). Solution: [`MindAttic.Deploy.slnx`](../MindAttic.Deploy.slnx).
+- **`MindAttic.Deploy.Cli/`** — C# console app (`net10.0`, Spectre.Console.Cli, assembly name `MindAttic.Deploy`). A thin front door that shells into the node pipeline (see [`Services/DeployRunner.cs`](../MindAttic.Deploy.Cli/Services/DeployRunner.cs) and [`Services/ProjectRoster.cs`](../MindAttic.Deploy.Cli/Services/ProjectRoster.cs)). Solution: [`MindAttic.Deploy.slnx`](../MindAttic.Deploy.slnx).
 - **`src/build.js`** — README → `out/<slug>.htm` renderer (`marked` + `highlight.js`), theme bundling, repo auto-discovery, manifest emission.
 - **`src/deploy.js`** — the three-mode pipeline (catalog / site / app); FTPS via `basic-ftp`; preDeploy hook runner.
 - **`src/parts.js`** — optional `parts` addon (ChiMesh/Claudia build picker), driven by a sibling repo's `config/parts.json`.
@@ -83,7 +83,7 @@ One pipeline that builds and FTPS-deploys every MindAttic web property — READM
 - **App deploy** (`runAppMode` / `deployOneApp`) — run `preDeploy`, `git add` `stageOnly`, commit if staged, push `branch` to fire the project's workflow; disabled apps print their note and exit 0.
 - **preDeploy hooks** (`executePreDeploy`) — `runUiuxPull` (git pull MindAttic.UiUx), `runPowershellHook`, `runDotnetBuildHook`.
 - **Credential load** (`loadFtpSettings`) — `MINDATTIC_FTP_JSON` env → `secrets/ftp.json`; FTPS via `accessFtp`.
-- **CLI dispatch** (`MindAttic.Deploy.Cli`) — `catalog` / `site` / `app` / `all` / `list` / `version` commands; default is an interactive multi-select menu; all shell into `DeployRunner.RunNode`.
+- **CLI dispatch** (`MindAttic.Deploy.Cli`) — `catalog` / `site` / `app` / `all` / `list` / `version` commands; default (no args) is an interactive multi-select menu (`MainMenuCommand`); all shell into `DeployRunner.RunNode`. `ProjectRoster` resolves the repo root and deserializes `projects.json` at startup.
 
 ## 5. The Laws {#DEP-§5}
 This project **inherits all org-wide laws** from [`MindAttic.HouseRules.md`](../../MindAttic.HouseRules.md) by reference — they are not restated here. Most directly load-bearing for this repo:

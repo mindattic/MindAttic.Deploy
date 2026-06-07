@@ -74,27 +74,20 @@ Pick the right array in `projects.json`:
 
 ---
 
-## Credentials (via MindAttic.Vault)
+## Credentials
 
-FTP credentials live in MindAttic.Vault's APPDATA file store, the same convention used by `LlmCredentialStore` and `BrokerCredentialStore`:
+FTP credentials are resolved by `deploy.js` in this order:
 
-```
-%APPDATA%\MindAttic\Deploy\ftp.json
-{
-  "profiles": {
-    "default":     { "host": "...", "port": 21, "user": "...", "password": "...", "secure": true },
-    "ryandebraal": { ... }
-  }
-}
-```
+1. **`MINDATTIC_FTP_JSON` env var** — the entire JSON object as one value (used by CI).
+2. **`secrets/ftp.json`** — gitignored local file (use `ftp.json.template` as the starting point).
 
 | Where | What |
 |-------|------|
-| Local | `%APPDATA%\MindAttic\Deploy\ftp.json` (Vault-managed). |
+| Local | `secrets/ftp.json` (gitignored). |
 | CI    | GitHub Actions secret `MINDATTIC_FTP_JSON` (the entire JSON object as one secret). |
 | READMEs | Public repos: anonymous fetch. Private repos: set `SUBSCRIBER_REPO_TOKEN` or `GITHUB_TOKEN`. |
 
-Lookup order in `deploy.js`: `MINDATTIC_FTP_JSON` env -> APPDATA Vault file -> legacy `secrets/ftp.json` (transitional fallback, gitignored).
+**Roadmap:** move FTP credentials to `%APPDATA%\MindAttic\Deploy\ftp.json` via MindAttic.Vault and retire `secrets/ftp.json` — this is the last unchecked item on the roadmap (see `DEP-US-E2` in `docs/USER_STORIES.md`).
 
 ---
 
