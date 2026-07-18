@@ -139,6 +139,13 @@
       "ftpRemotePath": "/",
       "files":         ["index.htm"],
       "stampFile":     "index.htm"
+    },
+    {
+      "slug":          "hyperspace",
+      "sourceDir":     "../Hyperspace",
+      "ftpRemotePath": "/mindattic.com/hyperspace",
+      "files":         ["index.htm"],
+      "stampFile":     "index.htm"
     }
   ],
 
