@@ -146,6 +146,12 @@
       "ftpRemotePath": "/mindattic.com/hyperspace",
       "files":         ["index.htm"],
       "stampFile":     "index.htm"
+    },
+    {
+      "slug":          "idiotproof-replays",
+      "sourceDir":     "../mindattic.com/idiotproof",
+      "ftpRemotePath": "/mindattic.com/idiotproof",
+      "uploadDir":     true
     }
   ],
 

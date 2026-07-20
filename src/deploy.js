@@ -335,6 +335,31 @@ async function deployOneSite(client, site) {
 
     const rawRemote = site.ftpRemotePath || '/';
     const remoteDir = rawRemote === '/' ? '/' : rawRemote.replace(/\/$/, '');
+
+    // Recursive whole-tree upload (site.uploadDir). Used for nested output like
+    // the IdiotProof replay archive (/idiotproof/replays/<ticker>/<ts>/...),
+    // which the flat `files` glob cannot express. Non-destructive: basic-ftp's
+    // uploadFromDir overwrites matching files and adds new ones but never
+    // deletes remote files absent locally.
+    if (site.uploadDir) {
+        const countLocal = (dir) => fs.readdirSync(dir, { withFileTypes: true })
+            .reduce((n, e) => n + (e.isDirectory() ? countLocal(path.join(dir, e.name)) : 1), 0);
+        const total = countLocal(sourceDir);
+        if (dryRun) {
+            process.stdout.write(`  [ftp]   (dry-run) would recursively upload ${total} file(s) ${sourceDir} -> ${remoteDir}\n`);
+            return { uploaded: 0, failed: 0 };
+        }
+        try {
+            await client.ensureDir(remoteDir);
+            await client.uploadFromDir(sourceDir, remoteDir);
+            process.stdout.write(`  [ok]   recursively uploaded ${total} file(s) -> ${remoteDir}\n`);
+            return { uploaded: total, failed: 0 };
+        } catch (e) {
+            process.stdout.write(`  [FAIL] recursive upload ${e.message}\n`);
+            return { uploaded: 0, failed: 1 };
+        }
+    }
+
     const files = expandFiles(sourceDir, site.files || ['index.htm']);
 
     if (dryRun) {
