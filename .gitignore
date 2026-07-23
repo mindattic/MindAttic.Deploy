@@ -9,3 +9,4 @@ secrets/ftp.json
 *.user
 .vs/
 artifacts/
+.claude/checkpoint.md
