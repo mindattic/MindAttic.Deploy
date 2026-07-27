@@ -29,10 +29,10 @@
       "branch":        "main",
       "workflow":      "deploy.yml",
       "disabled":      true,
-      "disabledNote":  "Workflow targets `idiotproof-web` App Service. Needs Azure infrastructure + AZURE_WEBAPP_PUBLISH_PROFILE secret in mindattic/IdiotProof. Set `disabled: false` once those exist.",
+      "disabledNote":  "Workflow targets `idiotproof-web` App Service and logs in via azure/login@v2, which needs the AZURE_CREDENTIALS secret (service-principal JSON) in mindattic/IdiotProof — not a publish profile. Needs Azure infrastructure provisioned first (see IdiotProof/tools/azure-provision.md). Set `disabled: false` once both exist.",
       "stageOnly":     [],
       "preDeploy": [
-        { "kind": "dotnet-build", "project": "../IdiotProof/src/IdiotProof.Blazor/IdiotProof.Blazor.csproj", "configuration": "Release", "required": true }
+        { "kind": "dotnet-build", "project": "../IdiotProof/IdiotProof.Blazor/IdiotProof.Blazor.csproj", "configuration": "Release", "required": true }
       ]
     },
     {
