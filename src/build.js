@@ -292,7 +292,7 @@ async function loadTheme(themeName, componentsVersion) {
 
     // Circuitboard parallax textures: console-bg.js reads
     // window.__cyberspaceCircuitboardSrcs (if set) instead of the /api/media/*
-    // default that only exists behind StreetSamurai's MediaController. Emit a
+    // default that only exists behind Prose's MediaController. Emit a
     // plain (non-defer) inline setter FIRST so it runs at parse time, before the
     // deferred console-bg.js executes its top-level IIFE. jsDelivr URLs (pinned
     // tag) rather than ~8 MB of base64 per page. Mirrors sync-mindattic-com.ps1.

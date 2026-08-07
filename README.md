@@ -28,10 +28,10 @@ Anything that ships via FTP or GitHub Actions CI:
 | `projects[]` — catalog landing page (README → `<slug>.htm`) | idiotproof, mindatticlegion, mindatticvault, taxratecollector, thinktank, tutor, mediabutler, gridgame2026, mindatticpsst | `/mindattic.com/<slug>.htm` |
 | `projects[]` — long-form build guide (Cyberspace theme + parts-picker) | claudia, chimesh | `/mindattic.com/<slug>.htm` |
 | `sites[]` — verbatim root-site FTP upload | mindattic.com, mindatticcares.com, ryandebraal.com | site root |
-| `apps[]` — Blazor / GitHub-Actions deploys (CI does the actual push) | streetsamurai, cursory, personagallery (enabled); idiotproof, taxratecollector, thinktank, tutor, mindattic.frontpage (disabled pending Azure infra) | — |
+| `apps[]` — Blazor / GitHub-Actions deploys (CI does the actual push) | prose, cursory, personagallery (enabled); idiotproof, taxratecollector, thinktank, tutor, mindattic.frontpage (disabled pending Azure infra) | — |
 
 **Not in this repo.**
-- `MindAttic.UiUx` owns the component sources (fonts, Cyberspace effects, BackHomeM, PinFooter) and the marker-block sync for three subscribers that need build-time splice (`mindattic.com/index.htm`, `StreetSamurai/wwwroot/`, `MindAttic.Psst/{terms,privacy}.htm`). This repo invokes those splice scripts as `preDeploy` hooks.
+- `MindAttic.UiUx` owns the component sources (fonts, Cyberspace effects, BackHomeM, PinFooter) and the marker-block sync for three subscribers that need build-time splice (`mindattic.com/index.htm`, `Prose/wwwroot/`, `MindAttic.Psst/{terms,privacy}.htm`). This repo invokes those splice scripts as `preDeploy` hooks.
 - `FractionsOfACent` is a Blazor/CLI scientific app, not an FTP landing page; it has no entry here.
 
 ---

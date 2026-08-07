@@ -25,7 +25,7 @@ One pipeline that builds and FTPS-deploys every MindAttic web property — READM
 ## 3. What it is NOT {#DEP-§3}
 - **NOT a component library.** It does not own fonts, the Cyberspace effects, or theme CSS — those live in `MindAttic.UiUx` and are pulled at runtime via jsDelivr / build-time via that repo's splice scripts. This repo only *invokes* two UiUx splice scripts as `preDeploy` hooks.
 - **NOT the host of per-project deploy state.** All the old per-project `scripts/cli/`, `deploy.bat`, `deploy.settings.json`, and marker-block `index.htm` files are retired; recreating them is a regression.
-- **NOT the actual app deployer for Blazor apps.** For `apps[]` entries it commits + pushes a branch; the project's *own* GitHub Actions workflow does the real Azure push. StreetSamurai et al. ship via CI, not via FTP from here.
+- **NOT the actual app deployer for Blazor apps.** For `apps[]` entries it commits + pushes a branch; the project's *own* GitHub Actions workflow does the real Azure push. Prose et al. ship via CI, not via FTP from here.
 - **NOT a SemVer project.** Whole-number versioning only ([HOUSE-LAW-1](../../MindAttic.HouseRules.md#HOUSE-LAW-1)), including the jsDelivr `componentsVersion` tags (`V1`, `V2`, … never `v1.1.1`).
 - **NOT a renderer for root sites.** `sites[]` files are uploaded verbatim; they are not passed through `template/index.template.htm`.
 
@@ -122,7 +122,7 @@ Evidence captured 2026-06-07 on the dev box (Windows 11, `node v24.14.0`, .NET 1
 | Node pipeline present + flag-validated | ✅ done | `src/build.js` / `src/deploy.js` reject unknown flags (exit 2); `--help` works. |
 | Catalog render | 🟡 partial | Code path complete; no committed automated test. Verified ad-hoc via `npm run build`. |
 | FTPS catalog/site upload | 🟡 partial | Requires live `secrets/ftp.json` + remote host; not exercised in this pass. |
-| App deploy (StreetSamurai) | 🟡 partial | Push-to-master CI path; not fired in this pass (would push real branches). |
+| App deploy (Prose) | 🟡 partial | Push-to-master CI path; not fired in this pass (would push real branches). |
 | Automated test suite | ⬜ planned | No test project exists in the repo. DoD ([§8](#DEP-§8)) calls for one — see [USER_STORIES backlog](USER_STORIES.md). |
 
 There is **no test project** in this repo today, so every `✅` above is build-proven only; behavioral capabilities are honestly `🟡`/`⬜` until a test or live run proves them.

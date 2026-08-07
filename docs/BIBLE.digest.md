@@ -18,7 +18,7 @@ One pipeline that builds and FTPS-deploys every MindAttic web property — READM
 ## 3. What it is NOT
 - **NOT a component library.** It does not own fonts, the Cyberspace effects, or theme CSS — those live in `MindAttic.UiUx` and are pulled at runtime via jsDelivr / build-time via that repo's splice scripts. This repo only *invokes* two UiUx splice scripts as `preDeploy` hooks.
 - **NOT the host of per-project deploy state.** All the old per-project `scripts/cli/`, `deploy.bat`, `deploy.settings.json`, and marker-block `index.htm` files are retired; recreating them is a regression.
-- **NOT the actual app deployer for Blazor apps.** For `apps[]` entries it commits + pushes a branch; the project's *own* GitHub Actions workflow does the real Azure push. StreetSamurai et al. ship via CI, not via FTP from here.
+- **NOT the actual app deployer for Blazor apps.** For `apps[]` entries it commits + pushes a branch; the project's *own* GitHub Actions workflow does the real Azure push. Prose et al. ship via CI, not via FTP from here.
 - **NOT a SemVer project.** Whole-number versioning only ([HOUSE-LAW-1](../../MindAttic.HouseRules.md#HOUSE-LAW-1)), including the jsDelivr `componentsVersion` tags (`V1`, `V2`, … never `v1.1.1`).
 - **NOT a renderer for root sites.** `sites[]` files are uploaded verbatim; they are not passed through `template/index.template.htm`.
 
@@ -67,7 +67,7 @@ For `apps[]`, the repo's contract ends at `git push <branch>`; the project's own
 
 ## Latest amendment
 ## DEP-A2 — Three new apps[] entries + CLI commands / ProjectRoster sync (supersedes —) {#DEP-A2}
-**What changed.** Three new entries added to `projects.json/apps[]` since Codex adoption: `cursory` (enabled, Cursory.Blazor cooperative cursor puzzles), `personagallery` (enabled, MindAttic.Legion.PersonaGallery Blazor), and `mindatticfrontend` (disabled pending Azure infra, MindAttic.Frontpage Blazor CMS). The enabled app count rose from 1 (StreetSamurai) to 3; total `apps[]` entries rose from 5 to 8. BIBLE §4.1 clarified to include `all` / `list` commands (already in code since Codex adoption, just omitted from the prose) and `ProjectRoster.cs` as a named service. CLAUDE.md apps[] count updated. README credentials section corrected to match `deploy.js` actual lookup order (env → `secrets/ftp.json`; APPDATA Vault path is roadmap-only).
+**What changed.** Three new entries added to `projects.json/apps[]` since Codex adoption: `cursory` (enabled, Cursory.Blazor cooperative cursor puzzles), `personagallery` (enabled, MindAttic.Legion.PersonaGallery Blazor), and `mindatticfrontend` (disabled pending Azure infra, MindAttic.Frontpage Blazor CMS). The enabled app count rose from 1 (Prose) to 3; total `apps[]` entries rose from 5 to 8. BIBLE §4.1 clarified to include `all` / `list` commands (already in code since Codex adoption, just omitted from the prose) and `ProjectRoster.cs` as a named service. CLAUDE.md apps[] count updated. README credentials section corrected to match `deploy.js` actual lookup order (env → `secrets/ftp.json`; APPDATA Vault path is roadmap-only).
 
 **Why.** Codex full-sync 2026-06-07 — reconcile docs against disk reality.
 

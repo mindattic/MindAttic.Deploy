@@ -27,8 +27,8 @@ app.Configure(config =>
 
     config.AddCommand<AppCommand>("app")
         .WithDescription("Deploy a Blazor / GitHub-Actions-driven app.")
-        .WithExample("app", "--slug", "streetsamurai")
-        .WithExample("app", "--slug", "streetsamurai", "--dry-run")
+        .WithExample("app", "--slug", "prose")
+        .WithExample("app", "--slug", "prose", "--dry-run")
         .WithExample("app", "--all");
 
     config.AddCommand<AllCommand>("all")

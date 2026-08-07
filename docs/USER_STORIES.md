@@ -30,7 +30,7 @@ updated: 2026-06-07
 - **DEP-US-C2 🟡** As the operator, `mindattic.com` re-splices its UiUx markers and fetches repo descriptions before upload. *Given mindattic.com's `preDeploy[]`, When I deploy it, Then `uiux-pull` + `sync-mindattic-com.ps1` + optional `fetch-descriptions.ps1` run first.* *(implemented via `executePreDeploy`; not run this pass.)*
 
 ## Epic D — Blazor / GitHub-Actions apps
-- **DEP-US-D1 🟡** As the operator, deploying an app runs its build/sync hooks, commits its `stageOnly` paths, and pushes its branch to fire the project's workflow. *Given `apps[]` `streetsamurai`, When I run `--app streetsamurai`, Then hooks run, staged changes commit, and `origin master` is pushed.* *(implemented: `deployOneApp`; would push real branches — not fired this pass.)*
+- **DEP-US-D1 🟡** As the operator, deploying an app runs its build/sync hooks, commits its `stageOnly` paths, and pushes its branch to fire the project's workflow. *Given `apps[]` `prose`, When I run `--app prose`, Then hooks run, staged changes commit, and `origin master` is pushed.* *(implemented: `deployOneApp`; would push real branches — not fired this pass.)*
 - **DEP-US-D2 🟡** As the operator, a disabled app prints its note and exits 0 instead of half-deploying. *Given `disabled:true`, When I target it, Then the `disabledNote` prints and nothing fires.* *(implemented: `deployOneApp` early return; no automated test.)*
 - **DEP-US-D3 🟡** As the operator, `--dry-run` previews an app/site/catalog deploy without committing, pushing, or uploading. *Given `--dry-run`, When I deploy, Then commit/push/FTP are skipped (hooks still run, by design).* *(implemented across all three modes; no automated test.)*
 
