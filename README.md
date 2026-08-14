@@ -113,14 +113,16 @@ Pick the right array in `projects.json`:
 
 ## Credentials
 
-FTP credentials are resolved by `deploy.js` in this order:
+FTP credentials are resolved in this order:
 
-1. **`MINDATTIC_FTP_JSON` env var** — the entire JSON object as one value (CI).
-2. **`secrets/ftp.json`** — gitignored local file (use `ftp.json.template` as the starting point).
+1. **MindAttic.Vault** — `%APPDATA%\MindAttic\Ftp\ftp.json` via `FtpCredentialStore` (`MindAttic.Vault` NuGet package, referenced by `MindAttic.Deploy.Cli`). `DeployRunner` forwards it to the `node` child process as `MINDATTIC_FTP_JSON` before the next two steps ever get a chance to run. This is the canonical local source as of `MindAttic.Vault` 2.0.0 — the same file MindAttic.Bob backs up and restores.
+2. **`MINDATTIC_FTP_JSON` env var already set on the process** — untouched when Vault has nothing. This is how CI provides its secret (a GitHub Actions secret set directly, with no Vault/`%APPDATA%` in play) and it keeps working unmodified.
+3. **`secrets/ftp.json`** — gitignored local file (use `ftp.json.template` as the starting point), read directly by `deploy.js` when neither of the above supplied anything.
 
 | Where | What |
 |-------|------|
-| Local | `secrets/ftp.json` (gitignored) |
+| Local (preferred) | `%APPDATA%\MindAttic\Ftp\ftp.json` via MindAttic.Vault |
+| Local (fallback) | `secrets/ftp.json` (gitignored) |
 | CI    | GitHub Actions secret `MINDATTIC_FTP_JSON` |
 | READMEs | Public repos: anonymous fetch. Private repos: set `SUBSCRIBER_REPO_TOKEN` or `GITHUB_TOKEN`. |
 

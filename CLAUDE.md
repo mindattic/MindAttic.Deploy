@@ -77,5 +77,7 @@ That is the entire procedure. No scaffold script, no per-project `scripts/cli/`,
 1. Remove the block from `projects.json`. The next deploy stops touching it; the server copy of `mindattic.com/<slug>.htm` stays until you manually FTP-delete it.
 
 ## Credentials
-- Local: `secrets/ftp.json` (gitignored). Real value committed to `secrets/ftp.json` already in the dev environment.
-- CI: GitHub Actions secret `MINDATTIC_FTP_JSON` whose value is the entire JSON object. `deploy.js` reads it from env when present.
+- Canonical local source: `%APPDATA%\MindAttic\Ftp\ftp.json` via MindAttic.Vault's `FtpCredentialStore` (`MindAttic.Vault` NuGet package referenced by `MindAttic.Deploy.Cli`). `DeployRunner.RunNode` calls `FtpCredentialStore.Default.TryGetJson()` and, when non-null, sets it as `MINDATTIC_FTP_JSON` on the child `node` process before falling through to the two sources below.
+- Local fallback: `secrets/ftp.json` (gitignored). Real value committed to `secrets/ftp.json` already in the dev environment. `deploy.js` still reads this directly when neither Vault nor an inherited `MINDATTIC_FTP_JSON` supplied anything — never modify `deploy.js`'s own resolution order, the C# bridge sits entirely on top of it.
+- CI: GitHub Actions secret `MINDATTIC_FTP_JSON` whose value is the entire JSON object. `deploy.js` reads it from env when present. CI runners have no `%APPDATA%\MindAttic`, so Vault resolution is a no-op there and this path is unaffected.
+- NuGet: `MindAttic.Vault` is restored from `lib/local-packages/` (vendored `.nupkg`, git-tracked) via the repo-root `NuGet.config` — GitHub-hosted CI has no `C:\LocalNuGet`. Bump the vendored `.nupkg` + the `PackageReference` version together when MindAttic.Vault releases a new version; see `MindAttic.Vault/IntegrationPlans/MindAttic.Deploy.md` in that repo for the full rollout plan.

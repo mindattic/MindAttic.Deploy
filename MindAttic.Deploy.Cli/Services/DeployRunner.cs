@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MindAttic.Vault.Credentials;
 using Spectre.Console;
 
 namespace MindAttic.Deploy.Cli.Services;
@@ -73,6 +74,20 @@ public sealed class DeployRunner
         // breaks while `npm run deploy` works.
         psi.ArgumentList.Add("--use-system-ca");
         foreach (var a in args) psi.ArgumentList.Add(a);
+
+        // deploy.js already supports MINDATTIC_FTP_JSON as a credential source
+        // (checked before secrets/ftp.json) - CI has used it for years via a
+        // GitHub Actions secret. Bridge Vault into that same seam: when
+        // %APPDATA%\MindAttic\Ftp\ftp.json has credentials, forward them as the
+        // env var so deploy.js needs no changes. Leave the inherited environment
+        // untouched when Vault has nothing - CI's own MINDATTIC_FTP_JSON and a
+        // developer's secrets/ftp.json fallback both keep working unmodified.
+        var ftpJson = FtpCredentialStore.Default.TryGetJson();
+        if (ftpJson is not null)
+        {
+            psi.EnvironmentVariables["MINDATTIC_FTP_JSON"] = ftpJson;
+            AnsiConsole.MarkupLine("[grey]  ftp:  MindAttic.Vault (%APPDATA%\\MindAttic\\Ftp\\ftp.json)[/]");
+        }
 
         // Escape the joined args / repo path: a forwarded value (a --ref, or a
         // --siblings-root/--themes-root path) can contain '[', which AnsiConsole
