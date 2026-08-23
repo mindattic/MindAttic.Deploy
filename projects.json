@@ -12,7 +12,8 @@
       "repo":          "mindattic/Prose",
       "branch":        "master",
       "workflow":      "azure-deploy.yml",
-      "disabled":      false,
+      "disabled":      true,
+      "disabledNote":  "Retired 2026-08-23 (author decision): Prose is local-only, single-user now, no hosted deployment target. Prose.Codex (the Blazor web host this pipeline built/published) was deleted 2026-08-13 (Epoch 4, 'Command-line only'); this entry had been silently broken since then. .github/workflows/azure-deploy.yml, Prose's infra/ Azure provisioning files, and docs/infra/AZURE_DEPLOY.md were all deleted in the same change that disabled this entry. Do not re-enable without a real reason to host Prose again.",
       "stageOnly":     ["v3/Prose.Codex/wwwroot"],
       "commitMessage": "Sync MindAttic.UiUx for deploy ({utc})",
       "preDeploy": [
