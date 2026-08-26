@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 out/
 secrets/ftp.json
 .DS_Store
@@ -9,4 +9,4 @@ secrets/ftp.json
 *.user
 .vs/
 artifacts/
-.claude/checkpoint.md
+.claude/quicksave.md
