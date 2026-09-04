@@ -111,6 +111,19 @@
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../MindAttic.Frontpage/MindAttic.Frontpage.Blazor/MindAttic.Frontpage.Blazor.csproj", "configuration": "Release", "required": true }
       ]
+    },
+    {
+      "slug":          "ideas",
+      "sourceDir":     "../MindAttic.Ideas",
+      "repo":          "mindattic/MindAttic.Ideas",
+      "branch":        "master",
+      "workflow":      "azure-deploy.yml",
+      "disabled":      true,
+      "disabledNote":  "Workflow + infra-as-code live in the repo (.github/workflows/azure-deploy.yml, infra/main.bicep, template validated against the subscription). Needs the estate provisioned: ./infra/provision.ps1 -ResourceGroup rg-mindattic-ideas, plus repo secret AZURE_WEBAPP_PUBLISH_PROFILE (and AZURE_CLIENT_ID/AZURE_TENANT_ID/AZURE_SUBSCRIPTION_ID for the migrate job, or dispatch with skip_migrate:true). Runbook: MindAttic.Ideas/docs/DEPLOYMENT.md. Set disabled:false once provisioned.",
+      "stageOnly":     [],
+      "preDeploy": [
+        { "kind": "dotnet-build", "project": "../MindAttic.Ideas/src/MindAttic.Ideas.Blazor/MindAttic.Ideas.Blazor.csproj", "configuration": "Release", "required": true }
+      ]
     }
   ],
 
