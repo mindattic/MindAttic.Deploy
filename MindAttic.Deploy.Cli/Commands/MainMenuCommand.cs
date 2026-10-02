@@ -79,8 +79,20 @@ public sealed class MainMenuCommand : Command
             }
             else
             {
+                // Members of a linked group each expand to the WHOLE group, so run the group once, not once per pick.
+                var linkedMembers = roster.Config.LinkedGroups.Values.SelectMany(g => g.Sites).ToHashSet();
+                var linkedRan = false;
                 foreach (var slug in sitePicks)
                 {
+                    if (linkedMembers.Contains(slug))
+                    {
+                        if (linkedRan)
+                        {
+                            AnsiConsole.MarkupLine($"[grey]site: {Markup.Escape(slug)} -- already deployed by the linked group[/]");
+                            continue;
+                        }
+                        linkedRan = true;
+                    }
                     AnsiConsole.WriteLine();
                     AnsiConsole.Write(new Rule($"[cyan]site: {Markup.Escape(slug)}[/]").LeftJustified());
                     int code = runner.RunSite(slug, all: false, dryRun: false);

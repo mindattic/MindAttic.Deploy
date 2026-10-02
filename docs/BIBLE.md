@@ -20,10 +20,12 @@ One pipeline that builds and FTPS-deploys every MindAttic web property — READM
 - **README is the content source.** Catalog pages are rendered from each project's own `README.md` (sibling repo on the dev box, GitHub raw in CI) through one canonical template, so editing a project's docs updates its landing page on the next deploy.
 - **Components ship via CDN, not sync.** Fonts/effects/themes load at runtime from jsDelivr against the [`componentsVersion`](#DEP-§5) ref pinned in `projects.json`; no per-subscriber inlining for landing pages.
 - **Two front doors, one engine.** `npm run deploy` (Node) and `MindAttic.Deploy.Cli` (C#) both drive the *same* `src/deploy.js` pipeline — the CLI shells into node. See [DEP-LAW-1](#DEP-LAW-1).
+- **Linked deploy.** `MindAttic.UiUx` (the shared jsDelivr asset package) and the three sites that load assets from it (`ryandebraal.com`, `mindatticcares.com`, `mindattic.com`) are a permanent **linked group** (`linkedGroups` in `projects.json`): deploying any one deploys all four — package tag + push, tag pinned in the pages, CDN verified byte-exact, then FTP — and aborts before any upload if a gate fails. See [DEP-A3](AMENDMENTS.md#DEP-A3) and `src/linked.js`.
 - **Auto-discovery + curation.** Every public, non-archived mindattic repo with a README gets a Cyberspace landing page automatically; curated `projects[]` entries override title/tagline/addon/theme.
 
 ## 3. What it is NOT {#DEP-§3}
 - **NOT a component library.** It does not own fonts, the Cyberspace effects, or theme CSS — those live in `MindAttic.UiUx` and are pulled at runtime via jsDelivr / build-time via that repo's splice scripts. This repo only *invokes* two UiUx splice scripts as `preDeploy` hooks.
+- **NOT the editor of component sources.** For the linked group it tags and pushes the `MindAttic.UiUx` repo and rewrites the tag pins in the sites' pages ([DEP-A3](AMENDMENTS.md#DEP-A3)); it never edits files inside `Components/`, `fonts/` or the domain asset folders.
 - **NOT the host of per-project deploy state.** All the old per-project `scripts/cli/`, `deploy.bat`, `deploy.settings.json`, and marker-block `index.htm` files are retired; recreating them is a regression.
 - **NOT the actual app deployer for Blazor apps.** For `apps[]` entries it commits + pushes a branch; the project's *own* GitHub Actions workflow does the real Azure push. Prose et al. ship via CI, not via FTP from here.
 - **NOT a SemVer project.** Whole-number versioning only ([HOUSE-LAW-1](../../MindAttic.HouseRules.md#HOUSE-LAW-1)), including the jsDelivr `componentsVersion` tags (`V1`, `V2`, … never `v1.1.1`).
@@ -73,6 +75,7 @@ One pipeline that builds and FTPS-deploys every MindAttic web property — READM
 - **AppProfile** — a Blazor / GitHub-Actions deploy target (`slug`, `repo`, `branch`, `workflow`, `disabled`, `stageOnly[]`, `commitMessage`, `preDeploy[]`).
 - **HookProfile** — a `preDeploy` step: `kind` ∈ {`uiux-pull`, `powershell`, `dotnet-build`}, plus `required`.
 - **DeployConfig** — the deserialized `projects.json` (`componentsVersion`, `ftpRemoteRoot`, the three arrays).
+- **Linked group** — a set of sites inseparable from one package repo (`linkedGroups`): `mindattic-web` = `MindAttic.UiUx` + `ryandebraal.com` + `mindatticcares.com` + `mindattic.com`. Deploying any member deploys all.
 - **Theme bundle** — `deps.json` + `theme.css` + `body-prelude.html` from `MindAttic.UiUx/Themes/<Theme>` (today only `Cyberspace`).
 - **Manifest** — `out/_manifest.json`, the list of slugs that actually rendered, so deploy uploads exactly what built.
 
@@ -80,6 +83,7 @@ One pipeline that builds and FTPS-deploys every MindAttic web property — READM
 - **Build** (`src/build.js`) — `effectiveProjects` (curated + auto-discovered), `loadReadme`, `loadTheme`, `substitute`, `buildOne` → writes `out/<slug>.htm` + manifest.
 - **Catalog deploy** (`runCatalogMode`) — implicit build, then FTPS-upload each manifest slug to `ftpRemoteRoot`.
 - **Site deploy** (`runSiteMode` / `deployOneSite`) — run `preDeploy`, stamp `<!-- Last Updated -->`, FTPS the `files[]` glob to `ftpRemotePath`.
+- **Linked deploy** (`src/linked.js`, `runLinkedMode`) — `planTargets` expands `--site <member>` / `--sites` / `--uiux` to the group (`--no-link` opts out); `inspectPackage` (preflight), `publishPackage` (tag + push), `rewritePins`, `buildCdnChecks` + `verifyCdn` (CDN gate), then `deployOneSite` per site; everything with a side effect is injected so it is testable.
 - **App deploy** (`runAppMode` / `deployOneApp`) — run `preDeploy`, `git add` `stageOnly`, commit if staged, push `branch` to fire the project's workflow; disabled apps print their note and exit 0.
 - **preDeploy hooks** (`executePreDeploy`) — `runUiuxPull` (git pull MindAttic.UiUx), `runPowershellHook`, `runDotnetBuildHook`.
 - **Credential load** (`loadFtpSettings`) — `MINDATTIC_FTP_JSON` env → `secrets/ftp.json`; FTPS via `accessFtp`.
@@ -101,11 +105,15 @@ Project-specific laws:
 ### DEP-LAW-2 — The registry is the only edit point for targets {#DEP-LAW-2}
 Adding, removing, or retagging a deploy target (slug/title/tagline/theme/addon/disabled/hooks) is an edit to [`projects.json`](#DEP-§4) and nothing else. README content lives in each project's own repo; visual layout lives in `template/index.template.htm`; components live in `MindAttic.UiUx`.
 
+*Refined by [DEP-A3](AMENDMENTS.md#DEP-A3):* `linkedGroups` is part of the registry (the only place group membership and FTP order are edited).
+
 ### DEP-LAW-3 — Credentials never live in code or rendered output {#DEP-LAW-3}
 FTP credentials resolve `MINDATTIC_FTP_JSON` env → `secrets/ftp.json` (gitignored), never embedded in source, the template, or any `out/` artifact. The roadmap target is `%APPDATA%\MindAttic\Deploy\ftp.json` via MindAttic.Vault (per [HOUSE-LAW-3](../../MindAttic.HouseRules.md#HOUSE-LAW-3)).
 
 ### DEP-LAW-4 — One theme source of truth, CDN-pinned {#DEP-LAW-4}
 All component/theme assets load from jsDelivr at the single `componentsVersion` ref in `projects.json`. A pinned tag MUST be an immutable whole-number tag carrying the current `Themes/<Theme>/{deps.json,theme.css}` layout; `"main"` is tip-of-tree and non-atomic (jsDelivr caches it ~12h). Bumping `componentsVersion` is how a UiUx change propagates.
+
+*Refined by [DEP-A3](AMENDMENTS.md#DEP-A3):* for the linked group the `MindAttic.UiUx@V<n>` pin in each site's page is chosen and verified by the deploy (never `@main`; never newer than the published tag).
 
 ### DEP-LAW-5 — Apps fire CI; this repo never FTPs an app {#DEP-LAW-5}
 For `apps[]`, the repo's contract ends at `git push <branch>`; the project's own workflow performs the real (Azure) deploy. A disabled app prints its `disabledNote` and exits 0 — it never half-fires.
@@ -123,9 +131,10 @@ Evidence captured 2026-06-07 on the dev box (Windows 11, `node v24.14.0`, .NET 1
 | Catalog render | 🟡 partial | Code path complete; no committed automated test. Verified ad-hoc via `npm run build`. |
 | FTPS catalog/site upload | 🟡 partial | Requires live `secrets/ftp.json` + remote host; not exercised in this pass. |
 | App deploy (Prose) | 🟡 partial | Push-to-master CI path; not fired in this pass (would push real branches). |
-| Automated test suite | ⬜ planned | No test project exists in the repo. DoD ([§8](#DEP-§8)) calls for one — see [USER_STORIES backlog](USER_STORIES.md). |
+| Linked deploy (`src/linked.js`) | 🟡 partial | 2026-10-02: `npm test` → 24 tests pass (tag math, expansion, pin rewrite, dirty/behind/tag-moved aborts, CDN gate incl. runtime-built base prefixes, dry-run writes nothing, partial FTP failure) against throwaway git repos + a local stand-in for jsDelivr + a fake FTP; one real `npm run deploy -- --site mindattic.com --dry-run` printed the plan for all four and left every repo byte-identical. No real tag/push/FTP has been fired yet. |
+| Automated test suite | 🟡 partial | `test/linked.test.js` covers the linked deploy only; catalog render, plain site/app modes and the C# CLI still have no automated tests. DoD ([§8](#DEP-§8)) — see [USER_STORIES backlog](USER_STORIES.md). |
 
-There is **no test project** in this repo today, so every `✅` above is build-proven only; behavioral capabilities are honestly `🟡`/`⬜` until a test or live run proves them.
+Outside the linked deploy there is **no automated test** in this repo, so every `✅` above is build-proven only; behavioral capabilities are honestly `🟡`/`⬜` until a test or live run proves them.
 
 ## 7. Active frontier {#DEP-§7}
 - **RFC:** [rfc/0001-test-harness.md](rfc/0001-test-harness.md) — introduce an automated test harness so deploy behaviors can graduate from 🟡 to ✅.
@@ -149,6 +158,7 @@ A change is **done** when:
 - **preDeploy hook** — a step run before upload/push: `uiux-pull`, `powershell`, or `dotnet-build`.
 - **componentsVersion** — the jsDelivr ref (`main` or a whole-number tag like `V4`) pinning MindAttic.UiUx Components + Themes.
 - **Auto-discovery** — building a Cyberspace page for every public mindattic repo with a README, via `gh repo list`.
-- **Manifest** — `out/_manifest.json`, the slugs that actually rendered.
+- **Manifest** — `out/_manifest.json`, the slugs that actually rendered. (Not to be confused with MindAttic.UiUx's `assets-manifest.json`, the verified list of package assets the CDN gate checks.)
+- **Linked group** — see §4.2; **release tag** — the whole-number `V<n>` tag of MindAttic.UiUx a linked deploy publishes (or reuses) and pins in the sites; **pin** — the `MindAttic.UiUx@V<n>` segment of a jsDelivr URL; **CDN gate** — the pre-FTP check that every package asset the sites use is live at the release tag with the exact bytes.
 - **Front door** — an entry point (the Node `npm run` scripts or the C# CLI) onto the one deploy engine.
 - **Stamp** — the `<!-- Last Updated: <iso> -->` comment written into a root site's `stampFile`.

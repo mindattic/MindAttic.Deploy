@@ -9,7 +9,7 @@ public sealed class SiteCommand : Command<SiteCommand.Settings>
     public sealed class Settings : CommandSettings
     {
         [CommandOption("--slug <SLUG>")]
-        [Description("Deploy a single root site by slug.")]
+        [Description("Deploy a root site by slug. A member of a linked group (UiUx + ryandebraal.com + mindatticcares.com + mindattic.com) deploys the WHOLE group.")]
         public string? Slug { get; set; }
 
         [CommandOption("--all")]
@@ -17,8 +17,16 @@ public sealed class SiteCommand : Command<SiteCommand.Settings>
         public bool All { get; set; }
 
         [CommandOption("--dry-run")]
-        [Description("Run preDeploy hooks but skip the stamp + FTP upload; preview what would deploy.")]
+        [Description("Preview only: nothing is tagged, pushed, written or uploaded (linked groups skip the mutating hooks).")]
         public bool DryRun { get; set; }
+
+        [CommandOption("--no-link")]
+        [Description("ESCAPE HATCH: deploy only the named site, skipping the linked publish/pin/CDN-gate flow.")]
+        public bool NoLink { get; set; }
+
+        [CommandOption("--with-tests")]
+        [Description("Linked deploy: also run MindAttic.UiUx/tests as a gate before publishing.")]
+        public bool WithTests { get; set; }
 
         public override Spectre.Console.ValidationResult Validate()
         {
@@ -32,6 +40,6 @@ public sealed class SiteCommand : Command<SiteCommand.Settings>
     {
         var roster = ProjectRoster.Load();
         var runner = new DeployRunner(roster.RepoRoot);
-        return runner.RunSite(settings.Slug, settings.All, settings.DryRun);
+        return runner.RunSite(settings.Slug, settings.All, settings.DryRun, settings.NoLink, settings.WithTests);
     }
 }

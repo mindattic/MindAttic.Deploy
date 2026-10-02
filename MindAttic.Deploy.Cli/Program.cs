@@ -23,7 +23,16 @@ app.Configure(config =>
     config.AddCommand<SiteCommand>("site")
         .WithDescription("Deploy a root site (verbatim FTPS upload).")
         .WithExample("site", "--slug", "mindattic.com")
+        .WithExample("site", "--slug", "mindattic.com", "--dry-run")
+        .WithExample("site", "--slug", "mindattic.com", "--no-link")
         .WithExample("site", "--all");
+
+    config.AddCommand<UiuxCommand>("uiux")
+        .WithAlias("package")
+        .WithDescription("Publish MindAttic.UiUx (tag + push), pin it, verify the CDN, then deploy every linked site.")
+        .WithExample("uiux")
+        .WithExample("uiux", "--dry-run")
+        .WithExample("uiux", "--with-tests");
 
     config.AddCommand<AppCommand>("app")
         .WithDescription("Deploy a Blazor / GitHub-Actions-driven app.")

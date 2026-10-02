@@ -35,13 +35,28 @@ public sealed class DeployRunner
         return RunNode(args);
     }
 
-    public int RunSite(string? slug, bool all, bool dryRun)
+    /// <summary>
+    /// A member of a linked group (projects.json linkedGroups) deploys the WHOLE group: package tag + push, pin,
+    /// CDN gate, then FTP for every site. <paramref name="noLink"/> is the escape hatch (named site only).
+    /// </summary>
+    public int RunSite(string? slug, bool all, bool dryRun, bool noLink = false, bool withTests = false)
     {
         var args = new List<string> { "src/deploy.js" };
         if (all) args.Add("--sites");
         else if (!string.IsNullOrWhiteSpace(slug)) { args.Add("--site"); args.Add(slug); }
         else throw new ArgumentException("RunSite requires either --slug or --all.");
         if (dryRun) args.Add("--dry-run");
+        if (noLink) args.Add("--no-link");
+        if (withTests) args.Add("--with-tests");
+        return RunNode(args);
+    }
+
+    /// <summary>Publish MindAttic.UiUx and deploy the whole linked group (same as deploying any member site).</summary>
+    public int RunUiux(bool dryRun, bool withTests)
+    {
+        var args = new List<string> { "src/deploy.js", "--uiux" };
+        if (dryRun) args.Add("--dry-run");
+        if (withTests) args.Add("--with-tests");
         return RunNode(args);
     }
 

@@ -21,8 +21,12 @@
  *
  * Flags (also accept `--flag=value` form):
  *   --only <slug>          : catalog mode -- deploy a landing page; repeatable for a batch
- *   --site <slug>          : site mode    -- deploy a single root site
- *   --sites                : site mode    -- deploy every root site
+ *   --site <slug>          : site mode    -- deploy a root site. A member of a linked group
+ *                            (projects.json linkedGroups) deploys the WHOLE group -- see src/linked.js
+ *   --sites                : site mode    -- deploy every root site (the linked group goes through the linked flow)
+ *   --uiux | --package     : linked mode  -- publish the MindAttic.UiUx package and deploy the whole linked group
+ *   --no-link              : site mode    -- escape hatch: deploy ONLY the named site, skipping the linked flow
+ *   --with-tests           : linked mode  -- also run MindAttic.UiUx/tests (npm run test:local) as a gate
  *   --app <slug>           : app mode     -- deploy a single Blazor app (via GitHub Actions)
  *   --apps                 : app mode     -- deploy every ENABLED app (use --include-disabled to surface stubs)
  *   --include-disabled     : app mode     -- include `disabled: true` apps in --apps iteration
@@ -59,8 +63,12 @@ deploy.js -- three pipelines under one roof (catalog / sites / apps).
 
 Flags (also accept --flag=value form):
   --only <slug>        catalog mode: deploy a landing page (repeatable)
-  --site <slug>        site mode:    deploy a single root site
-  --sites              site mode:    deploy every root site
+  --site <slug>        site mode:    deploy a root site (a linked-group member deploys the WHOLE group:
+                       package tag + push, pin, CDN gate, then FTP for every site in the group)
+  --sites              site mode:    deploy every root site (linked group first, via the linked flow)
+  --uiux | --package   linked mode:  publish MindAttic.UiUx and deploy the whole linked group
+  --no-link            site mode:    ESCAPE HATCH -- deploy only the named site (loud warning)
+  --with-tests         linked mode:  also run MindAttic.UiUx/tests as a gate before publishing
   --app <slug>         app mode:     deploy a single Blazor app via GitHub Actions
   --apps               app mode:     deploy every enabled app
   --include-disabled   app mode:     include disabled apps in --apps iteration
@@ -89,6 +97,7 @@ if (argv.includes('--help') || argv.includes('-h')) {
 // deploy of every catalog landing page. Fail loudly instead.
 const KNOWN_FLAGS = new Set([
     'only', 'site', 'sites', 'app', 'apps', 'include-disabled', 'dry-run', 'skip-build',
+    'uiux', 'package', 'no-link', 'with-tests',
     // Forwarded to build.js when running catalog mode (CI uses --from-github).
     'from-github', 'ref', 'siblings-root', 'themes-root', 'components',
     'help',
@@ -139,7 +148,7 @@ function flagAll(name) {
 // These parse argv and can throw on a malformed flag (e.g. `--site` with no
 // value). They run at module scope, outside main()'s catch, so wrap them here
 // to surface the clean `deploy.js: ...` error instead of a V8 stack trace.
-let onlySlugs, siteSlug, allSites, appSlug, allApps, dryRun, skipBuild, includeDisabled;
+let onlySlugs, siteSlug, allSites, appSlug, allApps, dryRun, skipBuild, includeDisabled, uiuxMode, noLink, withTests;
 try {
     onlySlugs       = flagAll('only');
     siteSlug        = stringFlag('site');
@@ -149,6 +158,9 @@ try {
     dryRun          = boolFlag('dry-run');
     skipBuild       = boolFlag('skip-build');
     includeDisabled = boolFlag('include-disabled');
+    uiuxMode        = boolFlag('uiux') || boolFlag('package');
+    noLink          = boolFlag('no-link');
+    withTests       = boolFlag('with-tests');
 } catch (e) {
     process.stderr.write(`deploy.js: ${e.message}\n`);
     process.exit(2);
@@ -298,14 +310,25 @@ function runDotnetBuildHook(project, configuration) {
     return r.status;
 }
 
-async function executePreDeploy(profile) {
+// opts (linked deploy only): { tag, skipUiuxPull }.
+//   - skipUiuxPull: the linked flow already verified the package repo (clean, not behind origin) and
+//     published it, so the `git pull` hook is redundant there.
+//   - tag: appended to a powershell hook that declares `tagArg` (e.g. "-CyberspaceCdnTag") so the sync
+//     script splices the SAME package tag the linked flow just published and pinned.
+async function executePreDeploy(profile, opts = {}) {
     for (const hook of profile.preDeploy || []) {
         const required = hook.required !== false;
         try {
             if (hook.kind === 'uiux-pull') {
-                runUiuxPull();
+                if (opts.skipUiuxPull) {
+                    process.stdout.write(`  [hook] uiux-pull skipped (linked deploy already verified + published MindAttic.UiUx)\n`);
+                } else {
+                    runUiuxPull();
+                }
             } else if (hook.kind === 'powershell') {
-                const code = runPowershellHook(hook.file, hook.args);
+                const hookArgs = [...(hook.args || [])];
+                if (opts.tag && hook.tagArg) hookArgs.push(hook.tagArg, opts.tag);
+                const code = runPowershellHook(hook.file, hookArgs);
                 if (code !== 0) throw new Error(`hook exited ${code}`);
             } else if (hook.kind === 'dotnet-build') {
                 const code = runDotnetBuildHook(hook.project, hook.configuration);
@@ -320,7 +343,7 @@ async function executePreDeploy(profile) {
     }
 }
 
-async function deployOneSite(client, site) {
+async function deployOneSite(client, site, opts = {}) {
     const sourceDir = path.resolve(repoRoot, site.sourceDir);
     if (!fs.existsSync(sourceDir)) {
         throw new Error(`sourceDir not found for site '${site.slug}': ${sourceDir}`);
@@ -328,10 +351,10 @@ async function deployOneSite(client, site) {
 
     process.stdout.write(`\nSite: ${site.slug}  (${sourceDir} -> ${site.ftpRemotePath})${dryRun ? '  [DRY-RUN]' : ''}\n`);
 
-    if (dryRun && (site.preDeploy || []).length > 0) {
+    if (dryRun && !opts.skipHooks && (site.preDeploy || []).length > 0) {
         process.stdout.write(`  [dry-run] note: preDeploy hooks still RUN (git pull / build / sync scripts may mutate state); only the stamp + FTP upload are skipped.\n`);
     }
-    await executePreDeploy(site);
+    if (!opts.skipHooks) await executePreDeploy(site);   // linked deploy runs the hooks earlier, before its CDN gate
 
     const rawRemote = site.ftpRemotePath || '/';
     const remoteDir = rawRemote === '/' ? '/' : rawRemote.replace(/\/$/, '');
@@ -532,13 +555,15 @@ async function uploadOne(client, project, ftpRemoteRoot) {
 
 // --- main -------------------------------------------------------------------
 
-async function runSiteMode(config) {
+async function runSiteMode(config, targetsOverride) {
     const sites = config.sites || [];
     if (sites.length === 0) {
         throw new Error('projects.json has no `sites` array.');
     }
     let targets = sites;
-    if (siteSlug) {
+    if (targetsOverride) {
+        targets = targetsOverride;
+    } else if (siteSlug) {
         targets = sites.filter((s) => s.slug === siteSlug);
         if (targets.length === 0) {
             throw new Error(`No site with slug '${siteSlug}' in projects.json (available: ${sites.map((s) => s.slug).join(', ')}).`);
@@ -647,12 +672,33 @@ async function runCatalogMode(config) {
     process.stdout.write(`\nDone. ${projects.length} deployed.\n`);
 }
 
+// Linked group (MindAttic.UiUx + ryandebraal.com + mindatticcares.com + mindattic.com): see src/linked.js.
+async function runLinkedMode(config, plan) {
+    const linked = require('./linked');
+    const result = await linked.runLinked(
+        { config, plan, dryRun, withTests, repoRoot },
+        {
+            log: (s) => process.stdout.write(s),
+            expandFiles,
+            deployOneSite,
+            executeHooks: (site, opts) => executePreDeploy(site, opts),
+            createClient: () => { const c = new ftp.Client(60_000); c.ftp.verbose = false; return c; },
+            accessFtp,
+            loadFtpSettings,
+        }
+    );
+    if (!result.ok) process.exit(1);
+}
+
 async function main() {
     const config = JSON.parse(await fsp.readFile(projectsPath, 'utf8'));
     if (appSlug || allApps) {
         await runAppMode(config);
-    } else if (siteSlug || allSites) {
-        await runSiteMode(config);
+    } else if (siteSlug || allSites || uiuxMode) {
+        const plan = require('./linked').planTargets(config, { siteSlug, allSites, uiux: uiuxMode, noLink });
+        for (const w of plan.warnings) process.stdout.write(`\n  [WARN] ${w}\n`);
+        if (plan.kind === 'linked') await runLinkedMode(config, plan);
+        else await runSiteMode(config, plan.sites);
     } else {
         await runCatalogMode(config);
     }

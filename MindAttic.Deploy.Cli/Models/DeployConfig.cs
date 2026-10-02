@@ -6,6 +6,7 @@ public sealed class DeployConfig
 {
     [JsonPropertyName("componentsVersion")] public string? ComponentsVersion { get; set; }
     [JsonPropertyName("ftpRemoteRoot")]     public string? FtpRemoteRoot    { get; set; }
+    [JsonPropertyName("linkedGroups")]      public Dictionary<string, LinkedGroup> LinkedGroups { get; set; } = new();
     [JsonPropertyName("sites")]             public List<SiteProfile>     Sites    { get; set; } = new();
     [JsonPropertyName("apps")]              public List<AppProfile>      Apps     { get; set; } = new();
     [JsonPropertyName("projects")]          public List<CatalogProject>  Projects { get; set; } = new();
@@ -34,6 +35,27 @@ public sealed class HookProfile
     [JsonPropertyName("configuration")] public string? Configuration { get; set; }
     [JsonPropertyName("args")]          public List<string> Args      { get; set; } = new();
     [JsonPropertyName("required")]      public bool?   Required      { get; set; }
+    /// <summary>Linked deploy: the powershell flag that receives the release tag (e.g. -CyberspaceCdnTag).</summary>
+    [JsonPropertyName("tagArg")]        public string? TagArg        { get; set; }
+}
+
+/// <summary>
+/// A permanently linked set: one shared package repo (MindAttic.UiUx, served over jsDelivr) plus the sites that
+/// consume it. Deploying ANY member deploys the whole group (see src/linked.js, DEP-A3).
+/// </summary>
+public sealed class LinkedGroup
+{
+    [JsonPropertyName("package")] public LinkedPackage Package { get; set; } = new();
+    [JsonPropertyName("sites")]   public List<string> Sites    { get; set; } = new();
+}
+
+public sealed class LinkedPackage
+{
+    [JsonPropertyName("slug")]      public string Slug      { get; set; } = "";
+    [JsonPropertyName("sourceDir")] public string SourceDir { get; set; } = "";
+    [JsonPropertyName("repo")]      public string Repo      { get; set; } = "";
+    [JsonPropertyName("branch")]    public string Branch    { get; set; } = "main";
+    [JsonPropertyName("tagPrefix")] public string TagPrefix { get; set; } = "V";
 }
 
 public sealed class CatalogProject
@@ -52,5 +74,7 @@ public sealed class SiteProfile
     [JsonPropertyName("ftpRemotePath")] public string FtpRemotePath { get; set; } = "";
     [JsonPropertyName("files")]         public List<string> Files   { get; set; } = new();
     [JsonPropertyName("stampFile")]     public string? StampFile    { get; set; }
+    /// <summary>Linked deploy: which pages load package assets (pinned + CDN-checked). Default: the stampFile.</summary>
+    [JsonPropertyName("pinFiles")]      public List<string>? PinFiles { get; set; }
     [JsonPropertyName("preDeploy")]     public List<HookProfile> PreDeploy { get; set; } = new();
 }
