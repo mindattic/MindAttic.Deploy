@@ -329,7 +329,9 @@ function runManifestVerify(pkgDir) {
 function runPackageTests(pkgDir) {
     const dir = path.join(pkgDir, 'tests');
     if (!fs.existsSync(path.join(dir, 'package.json'))) return { skipped: true, ok: true };
-    const r = child_process.spawnSync('npm', ['run', 'test:local'], { cwd: dir, shell: true, encoding: 'utf8', stdio: 'inherit' });
+    // A fixed command string (no args array): npm is npm.cmd on Windows so a shell is needed, and passing
+    // an args array together with `shell: true` is deprecated in Node (DEP0190) because args are not escaped.
+    const r = child_process.spawnSync('npm run test:local', { cwd: dir, shell: true, encoding: 'utf8', stdio: 'inherit' });
     return { ok: r.status === 0, message: `npm run test:local exited ${r.status}` };
 }
 
