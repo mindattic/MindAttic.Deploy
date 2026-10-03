@@ -6,8 +6,8 @@
     the exe. Otherwise it's a fast no-op.
 
 .DESCRIPTION
-    Called by run.bat on every launch so MindAttic.Console tabs always start a
-    current build without paying the `dotnet run` JIT/restore cost.
+    Called by run.bat on every launch so every run starts a current build
+    without paying the `dotnet run` JIT/restore cost.
 #>
 
 Set-StrictMode -Version Latest

@@ -409,7 +409,7 @@ npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site onl
 </tr>
 <tr>
 <td><code>MindAttic.Deploy all [--dry-run]</code></td>
-<td>Non-interactive "deploy everything": <code>--sites</code>, then <code>--apps --include-disabled</code>, back-to-back. Meant for external launchers (MindAttic.Console's Deploy-All menu, CI, slash commands) that do not want to drive an interactive prompt.</td>
+<td>Non-interactive "deploy everything": <code>--sites</code>, then <code>--apps --include-disabled</code>, back-to-back. Meant for scripts, CI and slash commands that do not want to drive an interactive prompt.</td>
 </tr>
 <tr>
 <td><code>MindAttic.Deploy list</code></td>
@@ -516,7 +516,7 @@ node src/deploy.js --help
 # Publish the CLI as a single-file win-x64 exe -&gt; artifacts\MindAttic.Deploy.exe
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1
 
-# run.bat (used by MindAttic.Console's "Run Project" tab): republishes only if
+# run.bat: republishes only if
 # sources changed since the last build (scripts\ensure-fresh.ps1), then execs
 # the published exe with whatever args were passed.
 run.bat --version</code></pre>

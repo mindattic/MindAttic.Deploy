@@ -6,11 +6,11 @@ using Spectre.Console.Cli;
 namespace MindAttic.Deploy.Cli.Commands;
 
 /// <summary>
-/// Non-interactive "deploy everything" — runs every root site and every app (including disabled stubs, so the user sees the per-stub
-/// note exactly once) back-to-back. Mirrors what MainMenuCommand does when the
-/// user toggles every box; exists as its own command so external launchers
-/// (MindAttic.Console's Deploy All menu, CI, slash commands) don't have to
-/// drive an interactive prompt.
+/// Non-interactive "deploy everything" — runs every root site and every app
+/// (including disabled stubs, so the user sees the per-stub note exactly once)
+/// back-to-back. Mirrors what MainMenuCommand does when the user toggles every
+/// box; exists as its own command so scripts, CI and slash commands don't have
+/// to drive an interactive prompt.
 /// </summary>
 public sealed class AllCommand : Command<AllCommand.Settings>
 {

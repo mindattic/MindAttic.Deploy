@@ -230,7 +230,7 @@ Built from `MindAttic.Deploy.Cli/` (`net10.0`, `AssemblyName=MindAttic.Deploy`, 
 | `MindAttic.Deploy site --slug <slug> [--dry-run] [--no-link] [--with-tests]` | Deploy one root or sub site (`--site`); a linked member deploys its whole group. Use `--all` instead of `--slug` for every site (`--sites`). |
 | `MindAttic.Deploy uiux [--dry-run] [--with-tests]` (alias `package`) | The linked deploy started from the package (`--uiux`). |
 | `MindAttic.Deploy app --slug <slug> [--dry-run] [--include-disabled]` | Deploy one Blazor/GitHub-Actions app; `--all` instead of `--slug` deploys every app. |
-| `MindAttic.Deploy all [--dry-run]` | Non-interactive "deploy everything": `--sites`, then `--apps --include-disabled`, back-to-back. Meant for external launchers (MindAttic.Console's Deploy-All menu, CI, slash commands) that do not want to drive an interactive prompt. |
+| `MindAttic.Deploy all [--dry-run]` | Non-interactive "deploy everything": `--sites`, then `--apps --include-disabled`, back-to-back. Meant for scripts, CI and slash commands that do not want to drive an interactive prompt. |
 | `MindAttic.Deploy list` | Print every target (slug, sourceDir and remote for sites; slug, repo, branch, workflow and enabled or disabled for apps) as Spectre tables. |
 | `MindAttic.Deploy version`, `--version` or `-v` | Print the assembly name, version, and the running exe's process path (works whether launched via `dotnet run`, the raw DLL, or the published single-file exe). |
 
@@ -349,7 +349,7 @@ node src/deploy.js --help
 # Publish the CLI as a single-file win-x64 exe -> artifacts\MindAttic.Deploy.exe
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1
 
-# run.bat (used by MindAttic.Console's "Run Project" tab): republishes only if
+# run.bat: republishes only if
 # sources changed since the last build (scripts\ensure-fresh.ps1), then execs
 # the published exe with whatever args were passed.
 run.bat --version

@@ -1,5 +1,5 @@
 @echo off
-rem Convenience launcher for MindAttic.Console's "Run Project" tab.
+rem Convenience launcher for the published CLI.
 rem  1. ensure-fresh.ps1 republishes artifacts\MindAttic.Deploy.exe iff sources changed
 rem  2. exec the published single-file exe with whatever args the caller passed
 
