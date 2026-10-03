@@ -90,3 +90,12 @@ flag validation, registry consistency).
 **Why.** Give MindAttic.Deploy a single source of truth with stable IDs, inherited org-wide House Rules, and tooling that keeps the injected digest honest.
 
 **Migration.** None — this repo had no prior `docs/`, `game_bible.md`, `ARCHITECTURE.md`, amendments file, or structured JSON canon. All content in the new docs was authored fresh from `README.md`, `CLAUDE.md`, `projects.json`, and the `src/` + `MindAttic.Deploy.Cli/` source. The §5 Laws inherit [`MindAttic.HouseRules.md`](../../MindAttic.HouseRules.md) by reference (that file was not modified). `projects.json` remains the operational registry (data the tool reads at runtime); it is documented in BIBLE §4 but is **not** reclassified as L5 canon-as-data, because it is live application config, not derived documentation.
+
+## DEP-A5 — Catalog landing pages move to MindAttic.UiUx `V8` (supersedes DEP-A4 "componentsVersion stays V4") {#DEP-A5}
+Decision (user, 2026-10-03): `projects.json` → `componentsVersion` is bumped from `V4` to `V8`. Verified
+before the bump: `Themes/Cyberspace/{deps.json,theme.css,body-prelude.html}` exist at `V8` and are unchanged
+from `V4` (only `Cyberspace.md` differs); `V8` adds the corrected Outfit Latin font (the `V4` copy was
+corrupt, so catalog pages were silently falling back to a system font), the losslessly recompressed
+circuitboard textures (6.2 MB → 1.7 MB, pixel-identical) and console-bg.js's optional host switches.
+Every catalog page picks it up on its next catalog deploy (`npm run deploy`).
+

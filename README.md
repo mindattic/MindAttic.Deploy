@@ -381,7 +381,7 @@ needs `SUBSCRIBER_REPO_TOKEN` or `GITHUB_TOKEN` set in the environment.
 
 ## Component versioning (`componentsVersion`)
 
-`projects.json` → `componentsVersion` (currently `"V4"`) pins the jsDelivr ref
+`projects.json` → `componentsVersion` (currently `"V8"`) pins the jsDelivr ref
 (`cdn.jsdelivr.net/gh/mindattic/MindAttic.UiUx@<ref>`) that every landing page loads its fonts,
 Cyberspace effects, and theme CSS from at runtime. Whole-number tags only (`V1`, `V2`, `V3`, …
 never SemVer) so a pin is atomic and immutable; `"main"` is tip-of-tree and jsDelivr caches it for
