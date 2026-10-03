@@ -9,7 +9,7 @@
               freshness). Exits non-zero on any hard error. Regenerates the digest in-memory
               and warns if docs/BIBLE.digest.md is out of date.
     digest  - regenerate docs/BIBLE.digest.md from BIBLE.md §1, §3, §5, §9 + a status index
-              + the latest amendment head.
+              + any pending decisions from docs/AMENDMENTS.md (section omitted when none).
 
   Windows PowerShell 5.1 safe (no pwsh-only syntax). Run:
     powershell -NoProfile -ExecutionPolicy Bypass -File tools/codex.ps1 doctor
@@ -135,7 +135,9 @@ function Get-StatusIndex {
     return $counts
 }
 
-function Get-LatestAmendment {
+# Every `## ` entry in AMENDMENTS.md (pending decisions not yet folded into the bible).
+# Returns '' when there are none.
+function Get-PendingDecisions {
     $path = Join-Path $DocsDir 'AMENDMENTS.md'
     if (-not (Test-Path $path)) { return '' }
     $fm = Get-FrontMatter (Read-TextFile $path)
@@ -144,10 +146,7 @@ function Get-LatestAmendment {
     $seen = $false
     foreach ($line in $lines) {
         $clean = $line.TrimEnd("`r")
-        if ($clean -match '^##\s') {
-            if ($seen) { break }
-            $seen = $true
-        }
+        if ($clean -match '^##\s') { $seen = $true }
         if ($seen) { $out.Add($clean) | Out-Null }
     }
     return (($out -join "`n").Trim())
@@ -165,7 +164,7 @@ function Build-DigestText {
     $s5 = Get-BibleSection $body '5'
     $s9 = Get-BibleSection $body '9'
     $idx = Get-StatusIndex
-    $amd = Get-LatestAmendment
+    $pending = Get-PendingDecisions
 
     $sb = New-Object System.Text.StringBuilder
     [void]$sb.AppendLine("AUTHORITATIVE - full detail in docs/BIBLE.md")
@@ -186,10 +185,12 @@ function Build-DigestText {
     [void]$sb.AppendLine($s9)
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## Status index (from USER_STORIES.md)")
-    [void]$sb.AppendLine(("- done: {0}  partial: {1}  planned: {2}  cut: {3}" -f $idx.Done, $idx.Partial, $idx.Planned, $idx.Cut))
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("## Latest amendment")
-    [void]$sb.AppendLine($amd)
+    [void]$sb.AppendLine(("- done: {0}  partial: {1}  planned: {2}" -f $idx.Done, $idx.Partial, $idx.Planned))
+    if ($pending) {
+        [void]$sb.AppendLine("")
+        [void]$sb.AppendLine("## Pending decisions (docs/AMENDMENTS.md)")
+        [void]$sb.AppendLine($pending)
+    }
     return $sb.ToString()
 }
 

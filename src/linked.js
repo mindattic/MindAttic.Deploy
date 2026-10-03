@@ -1,5 +1,5 @@
 /**
- * linked.js -- linked-group deploy (DEP-A3).
+ * linked.js -- linked-group deploy.
  *
  * MindAttic.UiUx (the shared jsDelivr asset package) and the three sites that
  * consume it (ryandebraal.com, mindatticcares.com, mindattic.com) are PERMANENTLY

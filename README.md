@@ -38,9 +38,9 @@ Try it: `npm install` then `npm run deploy -- --site mindattic.com --dry-run` fo
 
 ## Features
 
-MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the `mindattic.com` root page, `mindatticcares.com`, `ryandebraal.com` (these three plus the `MindAttic.UiUx` asset package deploy together as one linked group), two verbatim sub-folder sites, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and MindAttic.Ideas enabled; the rest disabled with a note). There is no per-project `scripts/cli/build-html.js`, `deploy.ps1`, `deploy.bat`, `deploy.settings.json`, or `node_modules/` anymore. All of that machinery used to live in each project's own repo and has been retired in favor of this one.
+MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the `mindattic.com` root page, `mindatticcares.com`, `ryandebraal.com` (these three plus the `MindAttic.UiUx` asset package deploy together as one linked group), two verbatim sub-folder sites, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and MindAttic.Ideas enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no `deploy.ps1`, `deploy.bat`, `deploy.settings.json` or `node_modules/`): everything lives here.
 
-Per-project landing pages (`mindattic.com/<slug>.htm`) are retired: each MindAttic repo's GitHub README is its project page now, and this repo no longer renders or uploads anything for individual projects. See [DEP-A6](docs/AMENDMENTS.md#DEP-A6).
+Each MindAttic repo's GitHub README is its project page; this repo renders and uploads nothing for individual projects.
 
 Two front doors drive the exact same engine:
 
@@ -112,13 +112,14 @@ Everything that ships via FTP or via a `git push` that fires a GitHub Actions wo
 |---|---|---|---|
 | `sites[]` | Verbatim root/sub-site upload, not templated | FTPS upload of a `files[]` glob (or a whole directory tree via `uploadDir`) to `ftpRemotePath` | mindattic.com (root), mindatticcares.com, ryandebraal.com, hyperspace, idiotproof-replays |
 | `linkedGroups` | Sites that are inseparable from a shared package repo | The linked flow ([Linked deploy](#linked-deploy)): package tag + push, pin, CDN gate, then FTP of every member site | `mindattic-web` = MindAttic.UiUx + ryandebraal.com + mindatticcares.com + mindattic.com |
-| `apps[]` | Blazor / GitHub-Actions-driven deploy | `git commit` (of `stageOnly` paths) + `git push <branch>`, which fires the project's own `.github/workflows/<workflow>` (the real Azure push happens there, not here) | cursory, personagallery, ideas (enabled); prose (retired, local-only), idiotproof, taxratecollector, thinktank, tutor, mindatticfrontend (disabled, each with a `disabledNote` explaining exactly why) |
+| `apps[]` | Blazor / GitHub-Actions-driven deploy | `git commit` (of `stageOnly` paths) + `git push <branch>`, which fires the project's own `.github/workflows/<workflow>` (the real Azure push happens there, not here) | cursory, personagallery, ideas (enabled); prose (local-only), idiotproof, taxratecollector, thinktank, tutor, mindatticfrontend (disabled, each with a `disabledNote` explaining exactly why) |
 
 Explicitly out of scope:
 
-- **Project pages.** Every MindAttic repo's GitHub README is its own project page (full docs plus the promo). The old README-driven catalog pages, their template, the `parts` addon and the repo auto-discovery were removed ([DEP-A6](docs/AMENDMENTS.md#DEP-A6)). The previously uploaded `/mindattic.com/<slug>.htm` files are being deleted from the server by hand; this repo never deletes remote files.
-- **UiUx sources.** `MindAttic.UiUx` owns the actual component sources and shared assets (fonts, logos, theme art, the Cyberspace effects). The sites pull them at runtime from jsDelivr; this repo never edits them. It does publish the package for the linked group (tag + push) and re-pin it in the sites (see [Linked deploy](#linked-deploy)), and it invokes UiUx's splice scripts as `preDeploy` hooks (for `mindattic.com`, and for the now-disabled Prose app).
-- **Old per-project deploy files.** Per-project `index.htm` files, `scripts/cli/`, `deploy.ps1`, `deploy.bat` and `deploy.settings.json` in any other repo are dead. If you find one, it is a leftover from before the migration: delete it, do not resurrect it.
+- **Project pages.** Every MindAttic repo's GitHub README is its own project page (full docs plus the promo); nothing here renders or uploads per-project pages.
+- **Remote cleanup.** This repo never deletes files on the FTP host; stale remote files are removed by hand.
+- **UiUx sources.** `MindAttic.UiUx` owns the actual component sources and shared assets (fonts, logos, theme art, the Cyberspace effects). The sites pull them at runtime from jsDelivr; this repo never edits them. It does publish the package for the linked group (tag + push) and re-pin it in the sites (see [Linked deploy](#linked-deploy)), and it invokes UiUx's splice scripts as `preDeploy` hooks (for `mindattic.com`, and for the disabled Prose app).
+- **Per-project deploy files.** A `scripts/cli/`, `deploy.ps1`, `deploy.bat` or `deploy.settings.json` in another repo is not used by anything: delete it rather than maintain it.
 
 ## How the pipeline works
 
@@ -192,9 +193,9 @@ Things to know:
 - The package is published before the CDN gate (the gate needs the tag to exist). If the gate fails the tag stays (immutable) and nothing is uploaded; fix and re-run.
 - If a push is rejected, the run aborts cleanly (nothing uploaded) and the new tag stays local; the next run, with `HEAD` unchanged, resumes from it and pushes it.
 - `--no-link` requires `--site` or `--sites`, and `--with-tests` requires a linked deploy; both exit 2 otherwise instead of being silently ignored.
-- `mindattic.com` uploads only `index.htm` (its generated `README.htm` is repo documentation and is no longer published, see [DEP-A4](docs/AMENDMENTS.md#DEP-A4)). Its only hooks are `uiux-pull` (skipped inside the linked flow) and the Cyberspace splice; the dormant `fetch-descriptions.ps1` hook was removed.
+- Each linked site uploads only its `index.htm` (a repo's generated `README.htm` is documentation, not part of the site). `mindattic.com`'s only hooks are `uiux-pull` (skipped inside the linked flow) and the Cyberspace splice.
 - `--dry-run` runs steps 1-5 read-only: no tag, push, pin edit, hook, FTP connect or upload. If the release tag is not published yet, it says the live CDN check "would run after the push".
-- Design record and rationale: [DEP-A3](docs/AMENDMENTS.md#DEP-A3). Tests: `npm test`.
+- Design canon: [docs/BIBLE.md](docs/BIBLE.md) (architecture §4, laws §5). Tests: `npm test`.
 
 ## Commands
 
@@ -217,7 +218,7 @@ The Node pipeline is canonical.
 | `npm test` | Run this repo's tests (`test/linked.test.js`, node:test). |
 | `node src/deploy.js --help` | Print the full flag reference and exit 0. |
 
-`deploy.js` rejects an unrecognized `--flag` with exit code 2 and prints usage, so a typo like `--hlep` never silently triggers a deploy. The retired catalog flags (`--only`, `--skip-build`, `--from-github`, `--ref`, `--siblings-root`, `--themes-root`, `--components`) are unknown flags now and are rejected the same way.
+`deploy.js` rejects an unrecognized `--flag` with exit code 2 and prints usage, so a typo like `--hlep` never silently triggers a deploy.
 
 ### MindAttic.Deploy.exe
 
@@ -249,7 +250,7 @@ cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --uiux           
 cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --site <slug>       # from a site (whole group deploys)
 ```
 
-Projects whose only "deploy" was their catalog landing page (`npm run deploy -- --only <slug>`) have nothing to deploy here any more: publishing their README to GitHub is the release of their page. A shim that still calls `--only` now fails with exit 2 (unknown flag).
+A project that only has a public page has no `/deploy` here: pushing its README to GitHub publishes the page.
 
 ## Adding a new deployable project
 
@@ -304,7 +305,7 @@ Credentials never live in source or in any uploaded file: `secrets/ftp.json` is 
 ```text
 projects.json                    canonical registry: sites[], apps[], linkedGroups
 src/
-  deploy.js                      the two-mode pipeline (site / app); FTPS via basic-ftp; preDeploy hook runner
+  deploy.js                      the pipeline (site / app modes); FTPS via basic-ftp; preDeploy hook runner
   linked.js                      the linked deploy (package tag + push, pin, CDN gate, FTP)
 test/
   linked.test.js                 node:test suite (npm test)
@@ -362,7 +363,7 @@ run.bat --version
 |---|---|---|
 | `.github/workflows/cli-ci.yml` | Push or PR touching `MindAttic.Deploy.Cli/**`, `global.json`, `Directory.Build.props`, or itself; also `workflow_dispatch` | `dotnet build` the CLI in Release, then smoke-tests it with `--version` (chosen because it short-circuits before touching `projects.json` or the Node pipeline, so it needs no secrets or sibling checkouts). |
 
-There is no CI deploy workflow: deploys run from the dev box. The manual-only catalog workflow `deploy.yml` was removed with the catalog ([DEP-A6](docs/AMENDMENTS.md#DEP-A6)).
+There is no CI deploy workflow: deploys run from the dev box.
 
 ## Glossary
 
@@ -384,9 +385,9 @@ There is no CI deploy workflow: deploys run from the dev box. The manual-only ca
 This README covers how to build, run, and extend MindAttic.Deploy. For architecture-level reasoning (why it exists, what the invariants are), the repo follows the layered Codex documentation standard:
 
 - [docs/BIBLE.md](docs/BIBLE.md) (L0): what MindAttic.Deploy is and is not, the architecture canon, and the project-specific laws (`DEP-LAW-*`), plus the inherited org-wide House Rules.
-- [docs/AMENDMENTS.md](docs/AMENDMENTS.md) (L1): append-only change log (`DEP-A<n>`); an amendment wins over the bible where the two disagree.
+- [docs/AMENDMENTS.md](docs/AMENDMENTS.md) (L1): decisions not yet folded into the bible (normally empty).
 - [User stories](docs/USER_STORIES.md) (L2): test-cited user stories (`DEP-US-<Epic><n>`); every story marked done cites the test that proves it.
-- [docs/rfc/](docs/rfc/): design notes, graduating into the bible and stories once settled.
+- [docs/rfc/](docs/rfc/): open design notes; once decided they are folded into the bible and stories and deleted.
 - [docs/BIBLE.digest.md](docs/BIBLE.digest.md): generated by `tools/codex.ps1 digest`; never hand-edited, injected as session context by `.claude/hooks/inject-digest.ps1`.
 - `MindAttic.HouseRules.md` (in the workspace root, the codex-standard repo): org-wide laws inherited by reference (whole-number versioning, soft-disable-never-delete, credentials-through-Vault, one engine with many front doors, verified-not-asserted definition of done).
 - [AGENTS.md](AGENTS.md): the entry point for coding agents working in this repo.

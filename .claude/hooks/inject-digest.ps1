@@ -18,8 +18,7 @@ try {
     $preamble = @"
 The following is the AUTHORITATIVE Codex digest for MindAttic.Deploy (DEP), generated from
 docs/BIBLE.md. Treat it as the source of truth for what this project IS, is NOT, and the laws
-that govern it. When in doubt, defer to docs/BIBLE.md (full detail) and docs/AMENDMENTS.md
-(an amendment wins over the bible). Do not contradict it.
+that govern it. When in doubt, defer to docs/BIBLE.md (full detail). Do not contradict it.
 
 "@
 

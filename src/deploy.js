@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
- * deploy.js -- two pipelines under one roof. (The third, catalog landing pages
- * at mindattic.com/<slug>.htm, was retired by DEP-A6: each repo's GitHub README
- * is its project page now. A bare run prints usage and exits 2.)
+ * deploy.js -- two pipelines under one roof: root sites (including the linked
+ * MindAttic.UiUx group, see linked.js) and apps. A run without a mode flag
+ * prints usage and exits 2.
  *
  *   Root sites (--site / --sites):
  *     For each site in projects.json.sites, run preDeploy hooks,
@@ -79,10 +79,8 @@ if (argv.includes('--help') || argv.includes('-h')) {
     process.exit(0);
 }
 
-// Reject unknown flags up front. The original parser ignored anything it did
-// not recognize, so a typo silently fell through to a full deploy. Fail loudly
-// instead. (The retired catalog flags --only/--skip-build/--from-github/... now
-// land here too, which is the point: DEP-A6.)
+// Reject unknown flags up front (usage, exit 2) so a typo can never fall
+// through to a deploy.
 const KNOWN_FLAGS = new Set([
     'site', 'sites', 'app', 'apps', 'include-disabled', 'dry-run',
     'uiux', 'package', 'no-link', 'with-tests',
@@ -148,10 +146,10 @@ if (withTests && !siteSlug && !allSites && !uiuxMode) {
     process.exit(2);
 }
 
-// No mode flag: there is no default pipeline any more (the catalog was retired by DEP-A6), so refuse
-// rather than guess. Exit 2 = usage error, same as an unknown flag.
+// No mode flag: there is no default pipeline, so refuse rather than guess.
+// Exit 2 = usage error, same as an unknown flag.
 if (!siteSlug && !allSites && !uiuxMode && !appSlug && !allApps) {
-    process.stderr.write(`deploy.js: no mode given (catalog landing pages were retired by DEP-A6).\n\n${USAGE}`);
+    process.stderr.write(`deploy.js: no mode given (use --site, --sites, --uiux, --app or --apps).\n\n${USAGE}`);
     process.exit(2);
 }
 

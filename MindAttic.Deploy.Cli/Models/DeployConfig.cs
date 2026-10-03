@@ -38,7 +38,7 @@ public sealed class HookProfile
 
 /// <summary>
 /// A permanently linked set: one shared package repo (MindAttic.UiUx, served over jsDelivr) plus the sites that
-/// consume it. Deploying ANY member deploys the whole group (see src/linked.js, DEP-A3).
+/// consume it. Deploying ANY member deploys the whole group (see src/linked.js).
 /// </summary>
 public sealed class LinkedGroup
 {

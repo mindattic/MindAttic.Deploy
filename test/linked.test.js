@@ -1,5 +1,5 @@
 /**
- * Tests for src/linked.js (linked-group deploy, DEP-A3).
+ * Tests for src/linked.js (linked-group deploy) and the src/deploy.js CLI guards.
  *
  *   npm test        (node --test test/)
  *
@@ -574,7 +574,7 @@ test('CDN failures are grouped by reason and capped (a wall of 404s stays readab
     assert.match(d.text(), /\.\.\.and 1 more/);
 });
 
-// --- audit fixes (DEP-A4) ---------------------------------------------------
+// --- preflight / publish / FTP edge cases ------------------------------------
 
 test('preflight: a stray local-only tag that is not at HEAD aborts (it would leave a gap in V1..Vn)', async () => {
     const w = makeWorld();
@@ -655,14 +655,14 @@ test('cli: linked-only modifiers are rejected where they would be silently ignor
     assert.equal(r.status, 2);
 });
 
-test('cli: catalog mode is retired (DEP-A6) -- a bare run and the old catalog flags exit 2', () => {
+test('cli: a bare run, --dry-run alone and unknown flags exit 2; the registry holds only sites/apps/linkedGroups', () => {
     const node = process.execPath;
     const script = path.join(__dirname, '..', 'src', 'deploy.js');
     let r = spawnSync(node, [script], { encoding: 'utf8' });
     assert.equal(r.status, 2);
     assert.match(r.stderr, /no mode given/);
     r = spawnSync(node, [script, '--dry-run'], { encoding: 'utf8' });
-    assert.equal(r.status, 2, '--dry-run alone no longer previews a catalog deploy');
+    assert.equal(r.status, 2, '--dry-run alone is not a mode');
     for (const f of ['--only', '--skip-build', '--from-github']) {
         r = spawnSync(node, [script, f, 'x'], { encoding: 'utf8' });
         assert.equal(r.status, 2, `${f} is rejected`);
@@ -686,6 +686,6 @@ test('registry: the linked group is consistent with sites[] and only ships what 
         assert.equal(s.stampFile, 'index.htm');
     }
     const mc = bySlug.get('mindattic.com');
-    assert.ok(!mc.preDeploy.some((h) => (h.file || '').includes('fetch-descriptions')), 'dormant fetch-descriptions hook removed');
+    assert.ok(!mc.preDeploy.some((h) => (h.file || '').includes('fetch-descriptions')), 'mindattic.com has no fetch-descriptions hook');
     assert.ok(mc.preDeploy.some((h) => h.tagArg === '-CyberspaceCdnTag'), 'the Cyberspace splice receives the release tag');
 });

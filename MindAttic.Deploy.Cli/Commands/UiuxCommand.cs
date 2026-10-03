@@ -7,7 +7,7 @@ namespace MindAttic.Deploy.Cli.Commands;
 /// <summary>
 /// `MindAttic.Deploy uiux` -- publish the MindAttic.UiUx package (tag + push) and deploy the whole linked group
 /// (ryandebraal.com, mindatticcares.com, mindattic.com). Identical to deploying any member site; shells into
-/// `node src/deploy.js --uiux`. See src/linked.js and DEP-A3.
+/// `node src/deploy.js --uiux`. See src/linked.js.
 /// </summary>
 public sealed class UiuxCommand : Command<UiuxCommand.Settings>
 {
