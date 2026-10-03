@@ -4,12 +4,9 @@ namespace MindAttic.Deploy.Cli.Models;
 
 public sealed class DeployConfig
 {
-    [JsonPropertyName("componentsVersion")] public string? ComponentsVersion { get; set; }
-    [JsonPropertyName("ftpRemoteRoot")]     public string? FtpRemoteRoot    { get; set; }
-    [JsonPropertyName("linkedGroups")]      public Dictionary<string, LinkedGroup> LinkedGroups { get; set; } = new();
-    [JsonPropertyName("sites")]             public List<SiteProfile>     Sites    { get; set; } = new();
-    [JsonPropertyName("apps")]              public List<AppProfile>      Apps     { get; set; } = new();
-    [JsonPropertyName("projects")]          public List<CatalogProject>  Projects { get; set; } = new();
+    [JsonPropertyName("linkedGroups")] public Dictionary<string, LinkedGroup> LinkedGroups { get; set; } = new();
+    [JsonPropertyName("sites")]        public List<SiteProfile> Sites { get; set; } = new();
+    [JsonPropertyName("apps")]         public List<AppProfile>  Apps  { get; set; } = new();
 }
 
 public sealed class AppProfile
@@ -56,15 +53,6 @@ public sealed class LinkedPackage
     [JsonPropertyName("repo")]      public string Repo      { get; set; } = "";
     [JsonPropertyName("branch")]    public string Branch    { get; set; } = "main";
     [JsonPropertyName("remote")]    public string Remote    { get; set; } = "origin";
-}
-
-public sealed class CatalogProject
-{
-    [JsonPropertyName("slug")]    public string Slug    { get; set; } = "";
-    [JsonPropertyName("repo")]    public string Repo    { get; set; } = "";
-    [JsonPropertyName("title")]   public string Title   { get; set; } = "";
-    [JsonPropertyName("tagline")] public string Tagline { get; set; } = "";
-    [JsonPropertyName("theme")]   public string? Theme  { get; set; }
 }
 
 public sealed class SiteProfile

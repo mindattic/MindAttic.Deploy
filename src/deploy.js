@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 /*
- * deploy.js -- three pipelines under one roof.
- *
- *   Catalog landing pages (default):
- *     For each project in projects.json.projects, FTPS-upload
- *     out/<slug>.htm to <ftpRemoteRoot>/<slug>.htm.
+ * deploy.js -- two pipelines under one roof. (The third, catalog landing pages
+ * at mindattic.com/<slug>.htm, was retired by DEP-A6: each repo's GitHub README
+ * is its project page now. A bare run prints usage and exits 2.)
  *
  *   Root sites (--site / --sites):
  *     For each site in projects.json.sites, run preDeploy hooks,
@@ -20,7 +18,6 @@
  *     and skip without firing.
  *
  * Flags (also accept `--flag=value` form):
- *   --only <slug>          : catalog mode -- deploy a landing page; repeatable for a batch
  *   --site <slug>          : site mode    -- deploy a root site. A member of a linked group
  *                            (projects.json linkedGroups) deploys the WHOLE group -- see src/linked.js
  *   --sites                : site mode    -- deploy every root site (the linked group goes through the linked flow)
@@ -30,8 +27,7 @@
  *   --app <slug>           : app mode     -- deploy a single Blazor app (via GitHub Actions)
  *   --apps                 : app mode     -- deploy every ENABLED app (use --include-disabled to surface stubs)
  *   --include-disabled     : app mode     -- include `disabled: true` apps in --apps iteration
- *   --dry-run              : any mode     -- preview without firing: app skips commit/push; site skips stamp+FTP; catalog still builds but skips FTP
- *   --skip-build           : catalog mode -- skip the implicit build step
+ *   --dry-run              : any mode     -- preview without firing: app skips commit/push; site skips stamp+FTP
  *
  * Credentials live in secrets/ftp.json (or MINDATTIC_FTP_JSON env in CI).
  */
@@ -47,7 +43,6 @@ const ftp           = require('basic-ftp');
 const repoRoot     = path.resolve(__dirname, '..');
 const projectsPath = path.join(repoRoot, 'projects.json');
 const secretsPath  = path.join(repoRoot, 'secrets', 'ftp.json');
-const outRoot      = path.join(repoRoot, 'out');
 
 // Normalize argv: split `--foo=bar` into `--foo` `bar` so the simple parser below works.
 const argv = process.argv.slice(2).flatMap((a) => {
@@ -59,10 +54,10 @@ const argv = process.argv.slice(2).flatMap((a) => {
 });
 
 const USAGE = `\
-deploy.js -- three pipelines under one roof (catalog / sites / apps).
+deploy.js -- two pipelines under one roof (sites / apps).
+A mode flag is required: --site, --sites, --uiux, --app or --apps.
 
 Flags (also accept --flag=value form):
-  --only <slug>        catalog mode: deploy a landing page (repeatable)
   --site <slug>        site mode:    deploy a root site (a linked-group member deploys the WHOLE group:
                        package tag + push, pin, CDN gate, then FTP for every site in the group)
   --sites              site mode:    deploy every root site (linked group first, via the linked flow)
@@ -73,14 +68,6 @@ Flags (also accept --flag=value form):
   --apps               app mode:     deploy every enabled app
   --include-disabled   app mode:     include disabled apps in --apps iteration
   --dry-run            preview without firing (no FTP, no git push)
-  --skip-build         catalog mode: skip the implicit build step
-
-  Forwarded to src/build.js (catalog mode only):
-  --from-github        force README fetch from GitHub raw (used in CI)
-  --ref <branch|tag>   git ref for README fetch
-  --siblings-root <p>  override sibling-repo lookup root
-  --themes-root <p>    path to MindAttic.UiUx/Themes
-  --components <ref>   override the MindAttic.UiUx CDN ref pinned in projects.json
 
   --help, -h           show this help and exit
 
@@ -93,16 +80,15 @@ if (argv.includes('--help') || argv.includes('-h')) {
 }
 
 // Reject unknown flags up front. The original parser ignored anything it did
-// not recognize, so `node src/deploy.js --help` silently ran a full FTPS
-// deploy of every catalog landing page. Fail loudly instead.
+// not recognize, so a typo silently fell through to a full deploy. Fail loudly
+// instead. (The retired catalog flags --only/--skip-build/--from-github/... now
+// land here too, which is the point: DEP-A6.)
 const KNOWN_FLAGS = new Set([
-    'only', 'site', 'sites', 'app', 'apps', 'include-disabled', 'dry-run', 'skip-build',
+    'site', 'sites', 'app', 'apps', 'include-disabled', 'dry-run',
     'uiux', 'package', 'no-link', 'with-tests',
-    // Forwarded to build.js when running catalog mode (CI uses --from-github).
-    'from-github', 'ref', 'siblings-root', 'themes-root', 'components',
     'help',
 ]);
-const VALUE_FLAGS = new Set(['only', 'site', 'app', 'ref', 'siblings-root', 'themes-root', 'components']);
+const VALUE_FLAGS = new Set(['site', 'app']);
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--')) {
@@ -132,31 +118,16 @@ function stringFlag(name) {
     return v;
 }
 
-function flagAll(name) {
-    const out = [];
-    for (let i = 0; i < argv.length; i++) {
-        if (argv[i] !== '--' + name) continue;
-        const v = argv[i + 1];
-        if (v === undefined || v.startsWith('--')) {
-            throw new Error(`Flag --${name} requires a value.`);
-        }
-        out.push(v);
-    }
-    return out;
-}
-
 // These parse argv and can throw on a malformed flag (e.g. `--site` with no
 // value). They run at module scope, outside main()'s catch, so wrap them here
 // to surface the clean `deploy.js: ...` error instead of a V8 stack trace.
-let onlySlugs, siteSlug, allSites, appSlug, allApps, dryRun, skipBuild, includeDisabled, uiuxMode, noLink, withTests;
+let siteSlug, allSites, appSlug, allApps, dryRun, includeDisabled, uiuxMode, noLink, withTests;
 try {
-    onlySlugs       = flagAll('only');
     siteSlug        = stringFlag('site');
     allSites        = boolFlag('sites');
     appSlug         = stringFlag('app');
     allApps         = boolFlag('apps');
     dryRun          = boolFlag('dry-run');
-    skipBuild       = boolFlag('skip-build');
     includeDisabled = boolFlag('include-disabled');
     uiuxMode        = boolFlag('uiux') || boolFlag('package');
     noLink          = boolFlag('no-link');
@@ -167,7 +138,7 @@ try {
 }
 
 // Linked-deploy modifiers are meaningless on their own; reject them instead of silently ignoring them
-// (e.g. `--no-link` in catalog mode would otherwise look like it did something).
+// (e.g. `--no-link` in app mode would otherwise look like it did something).
 if (noLink && !siteSlug && !allSites) {
     process.stderr.write(`deploy.js: --no-link only applies with --site <slug> or --sites.\n`);
     process.exit(2);
@@ -177,7 +148,14 @@ if (withTests && !siteSlug && !allSites && !uiuxMode) {
     process.exit(2);
 }
 
-// Single FTPS connect path for both catalog and site mode. Validates the
+// No mode flag: there is no default pipeline any more (the catalog was retired by DEP-A6), so refuse
+// rather than guess. Exit 2 = usage error, same as an unknown flag.
+if (!siteSlug && !allSites && !uiuxMode && !appSlug && !allApps) {
+    process.stderr.write(`deploy.js: no mode given (catalog landing pages were retired by DEP-A6).\n\n${USAGE}`);
+    process.exit(2);
+}
+
+// Single FTPS connect path for site mode and the linked deploy. Validates the
 // server certificate by default; a legacy/self-signed host can opt out by
 // setting "rejectUnauthorized": false in secrets/ftp.json.
 function accessFtp(client, ftpCfg) {
@@ -208,28 +186,6 @@ function loadFtpSettings() {
         throw new Error(`secrets/ftp.json not found. Copy ftp.json.template -> ftp.json and fill in credentials, or set MINDATTIC_FTP_JSON.`);
     }
     return JSON.parse(fs.readFileSync(secretsPath, 'utf8'));
-}
-
-function runBuild() {
-    return new Promise((resolve, reject) => {
-        const args = ['src/build.js'];
-        for (const slug of onlySlugs) args.push('--only', slug);
-        // Forward every build-relevant flag we accept. Previously only --only
-        // was forwarded, so CI's `--from-github` was a silent no-op.
-        if (boolFlag('from-github')) args.push('--from-github');
-        const passthroughString = ['ref', 'siblings-root', 'themes-root', 'components'];
-        for (const name of passthroughString) {
-            const v = stringFlag(name);
-            if (v !== undefined) args.push('--' + name, v);
-        }
-        // Forward the parent's node flags (e.g. --use-system-ca, which the
-        // `deploy` npm script sets so TLS validates against the OS trust store
-        // behind this box's HTTPS-interception proxy). Without this the implicit
-        // build step's GitHub README fetch would silently lose the flag.
-        const proc = child_process.spawn(process.execPath, [...process.execArgv, ...args], { cwd: repoRoot, stdio: 'inherit' });
-        proc.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`build.js exited ${code}`)));
-        proc.on('error', reject);
-    });
 }
 
 // --- site-mode helpers ------------------------------------------------------
@@ -546,24 +502,6 @@ async function runAppMode(config) {
     if (errors > 0) process.exit(1);
 }
 
-// --- catalog mode (unchanged behavior) --------------------------------------
-
-async function uploadOne(client, project, ftpRemoteRoot) {
-    const localFile  = path.join(outRoot, `${project.slug}.htm`);
-    if (!fs.existsSync(localFile)) {
-        throw new Error(`out/${project.slug}.htm not found. Run build first.`);
-    }
-    const remoteRoot = ftpRemoteRoot.replace(/\/$/, '');
-    const remoteFile = `${remoteRoot}/${project.slug}.htm`;
-
-    // The caller runs ensureDir(remoteRoot) once before the loop, leaving the
-    // FTP working dir there, so each upload is just a relative put. (Previously
-    // ensureDir fired once per project — redundant since the root is shared.)
-    await client.uploadFrom(localFile, `${project.slug}.htm`);
-    const size = (await fsp.stat(localFile)).size;
-    return { slug: project.slug, remoteFile, size };
-}
-
 // --- main -------------------------------------------------------------------
 
 async function runSiteMode(config, targetsOverride) {
@@ -611,78 +549,6 @@ async function runSiteMode(config, targetsOverride) {
     if (totalFailed > 0 || siteErrors.length > 0) process.exit(1);
 }
 
-async function runCatalogMode(config) {
-    const ftpRemoteRoot = config.ftpRemoteRoot || '/mindattic.com';
-
-    if (!skipBuild) await runBuild();
-
-    // Upload from the build manifest (curated + auto-discovered slugs that
-    // actually produced a page), falling back to config.projects if the build
-    // step was skipped and no manifest exists.
-    const manifestPath = path.join(outRoot, '_manifest.json');
-    let slugs;
-    if (fs.existsSync(manifestPath)) {
-        slugs = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    } else {
-        slugs = (config.projects || []).map((p) => p.slug);
-    }
-    if (onlySlugs.length > 0) {
-        const known = new Set(slugs);
-        const missing = onlySlugs.filter((s) => !known.has(s));
-        if (missing.length > 0) {
-            throw new Error(`Unknown catalog slug(s): ${missing.join(', ')}. Available: ${[...known].join(', ')}.`);
-        }
-        const wanted = new Set(onlySlugs);
-        slugs = slugs.filter((s) => wanted.has(s));
-    }
-    let projects = slugs.map((slug) => ({ slug }));
-
-    if (dryRun) {
-        process.stdout.write(`\nDeploying ${projects.length} landing page(s)  [DRY-RUN -- no FTP connect, no uploads]\n`);
-        const remoteRoot = ftpRemoteRoot.replace(/\/$/, '');
-        for (const project of projects) {
-            const localFile = path.join(outRoot, `${project.slug}.htm`);
-            const exists = fs.existsSync(localFile);
-            const size = exists ? fs.statSync(localFile).size : 0;
-            const label = exists ? `${String(size).padStart(7)} bytes` : `[missing build artifact]`;
-            process.stdout.write(`  [ftp]  (dry-run) would upload ${project.slug.padEnd(18)} ${label} -> ${remoteRoot}/${project.slug}.htm\n`);
-        }
-        process.stdout.write(`\nDone. ${projects.length} would deploy.\n`);
-        return;
-    }
-
-    const ftpCfg = loadFtpSettings();
-    const client = new ftp.Client(60_000);
-    client.ftp.verbose = false;
-
-    process.stdout.write(`\nDeploying ${projects.length} landing page(s) to ftp://${ftpCfg.host}:${ftpCfg.port || 21}${ftpRemoteRoot}/...\n`);
-
-    const failed = [];
-    try {
-        await accessFtp(client, ftpCfg);
-        // All catalog pages share one remote root; navigate into it once.
-        await client.ensureDir(ftpRemoteRoot.replace(/\/$/, ''));
-
-        for (const project of projects) {
-            try {
-                const r = await uploadOne(client, project, ftpRemoteRoot);
-                process.stdout.write(`  [ok]   ${r.slug.padEnd(18)} ${String(r.size).padStart(7)} bytes -> ${r.remoteFile}\n`);
-            } catch (e) {
-                failed.push({ slug: project.slug, error: e.message });
-                process.stdout.write(`  [FAIL] ${project.slug.padEnd(18)} ${e.message}\n`);
-            }
-        }
-    } finally {
-        client.close();
-    }
-
-    if (failed.length) {
-        process.stderr.write(`\n${failed.length} project(s) failed to deploy.\n`);
-        process.exit(1);
-    }
-    process.stdout.write(`\nDone. ${projects.length} deployed.\n`);
-}
-
 // Linked group (MindAttic.UiUx + ryandebraal.com + mindatticcares.com + mindattic.com): see src/linked.js.
 async function runLinkedMode(config, plan) {
     const linked = require('./linked');
@@ -705,7 +571,8 @@ async function main() {
     const config = JSON.parse(await fsp.readFile(projectsPath, 'utf8'));
     if (appSlug || allApps) {
         await runAppMode(config);
-    } else if (siteSlug || allSites || uiuxMode) {
+    } else {
+        // Mode flags were validated at startup, so this is --site / --sites / --uiux.
         const plan = require('./linked').planTargets(config, { siteSlug, allSites, uiux: uiuxMode, noLink });
         for (const w of plan.warnings) process.stdout.write(`\n  [WARN] ${w}\n`);
         if (plan.kind !== 'linked' && withTests) {
@@ -713,8 +580,6 @@ async function main() {
         }
         if (plan.kind === 'linked') await runLinkedMode(config, plan);
         else await runSiteMode(config, plan.sites);
-    } else {
-        await runCatalogMode(config);
     }
 }
 

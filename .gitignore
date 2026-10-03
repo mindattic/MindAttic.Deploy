@@ -1,5 +1,4 @@
 ﻿node_modules/
-out/
 secrets/ftp.json
 .DS_Store
 

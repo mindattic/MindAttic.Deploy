@@ -14,12 +14,6 @@ app.Configure(config =>
 {
     config.SetApplicationName("MindAttic.Deploy");
 
-    config.AddCommand<CatalogCommand>("catalog")
-        .WithDescription("Deploy catalog landing pages (mindattic.com/<slug>.htm).")
-        .WithExample("catalog")
-        .WithExample("catalog", "--only", "mindatticvault")
-        .WithExample("catalog", "--only", "claudia", "--skip-build");
-
     config.AddCommand<SiteCommand>("site")
         .WithDescription("Deploy a root site (verbatim FTPS upload).")
         .WithExample("site", "--slug", "mindattic.com")
@@ -41,12 +35,12 @@ app.Configure(config =>
         .WithExample("app", "--all");
 
     config.AddCommand<AllCommand>("all")
-        .WithDescription("Deploy every catalog page, root site, and app (non-interactive).")
+        .WithDescription("Deploy every root site and app (non-interactive).")
         .WithExample("all")
         .WithExample("all", "--dry-run");
 
     config.AddCommand<ListCommand>("list")
-        .WithDescription("Print every deploy target (catalog, sites, apps) with slugs + status.");
+        .WithDescription("Print every deploy target (sites, apps) with slugs + status.");
 
     config.AddCommand<VersionCommand>("version")
         .WithAlias("--version")

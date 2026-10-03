@@ -4,7 +4,7 @@ using Spectre.Console.Cli;
 
 namespace MindAttic.Deploy.Cli.Commands;
 
-/// <summary>Print every deploy target across the three axes.</summary>
+/// <summary>Print every deploy target (root sites, apps).</summary>
 public sealed class ListCommand : Command
 {
     public override int Execute(CommandContext context)
@@ -13,19 +13,6 @@ public sealed class ListCommand : Command
         var cfg = roster.Config;
 
         AnsiConsole.MarkupLine($"[grey]repo: {roster.RepoRoot}[/]");
-
-        if (cfg.Projects.Count > 0)
-        {
-            var t = new Table()
-                .Title($"[cyan]Catalog landing pages ({cfg.Projects.Count})[/]")
-                .Border(TableBorder.SimpleHeavy)
-                .AddColumn("slug")
-                .AddColumn("repo")
-                .AddColumn("theme");
-            foreach (var p in cfg.Projects)
-                t.AddRow(Markup.Escape(p.Slug), Markup.Escape(p.Repo), Markup.Escape(p.Theme ?? ""));
-            AnsiConsole.Write(t);
-        }
 
         if (cfg.Sites.Count > 0)
         {

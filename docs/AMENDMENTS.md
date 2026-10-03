@@ -4,7 +4,7 @@ project: MindAttic.Deploy
 code: DEP
 layer: amendments
 status: living
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # MindAttic.Deploy — Amendments (append-only; amendment wins over the bible)
@@ -12,6 +12,44 @@ updated: 2026-10-02
 > Append-only change log. Never rewrite an amendment; supersede it with a new one. When this list
 > grows beyond ~25, fold the settled ones into [BIBLE.md](BIBLE.md) and start a new epoch (note the
 > git tag) — full history stays in git.
+
+## DEP-A6 — Catalog landing pages retired (supersedes DEP-A5, the catalog half of DEP-A4, and the bible's catalog/README-render/parts-addon/auto-discovery canon) {#DEP-A6}
+**Decision (user, 2026-10-03):** every MindAttic repo's GitHub README is now its own project page (full docs plus
+the promo), so the README-driven landing pages at `mindattic.com/<slug>.htm` are retired. `mindattic.com` is a
+single page (wordmark + three buttons) and links to GitHub, not to per-project pages.
+
+**What was removed.**
+- Code: `src/build.js` (README → `out/<slug>.htm` renderer, theme bundling, `gh repo list` auto-discovery,
+  `out/_manifest.json`), `src/parts.js` (the `parts` addon for ChiMesh/Claudia), `template/index.template.htm`,
+  the generated `out/` folder, and `.github/workflows/deploy.yml` (the manual CI catalog deploy).
+- `src/deploy.js`: catalog mode (`runCatalogMode`, `runBuild`, `uploadOne`) and the flags `--only`, `--skip-build`,
+  `--from-github`, `--ref`, `--siblings-root`, `--themes-root`, `--components`. They are now unknown flags (exit 2).
+- `projects.json`: the `projects[]` array, `componentsVersion` and `ftpRemoteRoot`; `$comment` rewritten. `sites[]`,
+  `apps[]` and `linkedGroups` are unchanged.
+- `package.json`: the `build` script and the `marked` / `highlight.js` dependencies; `npm run all` is now sites + apps.
+- C# CLI: the `catalog` command (`CatalogCommand.cs`, `DeployRunner.RunCatalog`); the interactive menu, `list` and
+  `all` no longer show or run catalog pages; `DeployConfig` lost `ComponentsVersion`, `FtpRemoteRoot`, `Projects` and
+  `CatalogProject`.
+
+**What changed in behaviour.** There is no default pipeline any more. A bare `npm run deploy` (no `--site`,
+`--sites`, `--uiux`, `--app` or `--apps`) prints usage and exits 2 ("no mode given"); so does `--dry-run` on its
+own. The two remaining pipelines are root sites (including the linked group of [DEP-A3](#DEP-A3)) and apps.
+
+**Supersedes.** [DEP-A5](#DEP-A5) (the `componentsVersion` `V8` pin) in full, and the "Not changed (recommendation)"
+`componentsVersion` paragraph of [DEP-A4](#DEP-A4). In the bible: the catalog bullets of §1/§2/§3/§4 (README is the
+content source, components ship via CDN at `componentsVersion`, auto-discovery + curation, `CatalogProject`,
+theme bundle, manifest, Build/Catalog-deploy services), [DEP-LAW-4](BIBLE.md#DEP-LAW-4) as written for
+`componentsVersion` (the per-site pin of DEP-A3 is what remains), the catalog clause of
+[DEP-LAW-6](BIBLE.md#DEP-LAW-6), and stories DEP-US-B1..B3 and DEP-US-E3 (now cut). Asset versions for the sites are
+pinned per site by the linked deploy, not in `projects.json`.
+
+**Server cleanup (manual).** The previously uploaded `/mindattic.com/<slug>.htm` files are still on the FTP host.
+The owner is deleting them by hand; this repo never deletes remote files and no automated remote deletion was added.
+
+**Migration.** Use `--site`/`--sites`/`--uiux` or `--app`/`--apps`. A project's `/deploy` shim that ran
+`npm run deploy -- --only <slug>` has nothing to deploy any more (its README on GitHub is the page). Tests:
+`npm test` → 30 tests (1 new: bare run and the old catalog flags exit 2, the registry keys and files are gone).
+`dotnet build MindAttic.Deploy.Cli -c Release` → 0 warnings.
 
 ## DEP-A4 — Linked-deploy audit fixes; mindattic.com ships only its page (supersedes DEP-A3's fetch-descriptions bullet) {#DEP-A4}
 **What changed** (audit after the first real linked deploy, which published `V7`, 2026-10-02):

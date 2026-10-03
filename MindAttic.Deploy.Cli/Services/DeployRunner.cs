@@ -10,31 +10,6 @@ public sealed class DeployRunner
     private readonly string _repoRoot;
     public DeployRunner(string repoRoot) => _repoRoot = repoRoot;
 
-    public int RunCatalog(
-        IEnumerable<string>? onlySlugs, bool skipBuild, bool dryRun,
-        bool fromGithub = false, string? gitRef = null,
-        string? siblingsRoot = null, string? themesRoot = null, string? components = null)
-    {
-        var args = new List<string> { "src/deploy.js" };
-        if (onlySlugs != null)
-        {
-            foreach (var slug in onlySlugs)
-            {
-                if (string.IsNullOrWhiteSpace(slug)) continue;
-                args.Add("--only");
-                args.Add(slug);
-            }
-        }
-        if (skipBuild) args.Add("--skip-build");
-        if (dryRun) args.Add("--dry-run");
-        if (fromGithub) args.Add("--from-github");
-        if (!string.IsNullOrWhiteSpace(gitRef))      { args.Add("--ref");            args.Add(gitRef); }
-        if (!string.IsNullOrWhiteSpace(siblingsRoot)) { args.Add("--siblings-root"); args.Add(siblingsRoot); }
-        if (!string.IsNullOrWhiteSpace(themesRoot))   { args.Add("--themes-root");   args.Add(themesRoot); }
-        if (!string.IsNullOrWhiteSpace(components))   { args.Add("--components");    args.Add(components); }
-        return RunNode(args);
-    }
-
     /// <summary>
     /// A member of a linked group (projects.json linkedGroups) deploys the WHOLE group: package tag + push, pin,
     /// CDN gate, then FTP for every site. <paramref name="noLink"/> is the escape hatch (named site only).
@@ -83,8 +58,8 @@ public sealed class DeployRunner
         };
         // Match package.json's `deploy`/`all` scripts: trust the OS certificate
         // store. This box re-signs HTTPS via a TLS-interception proxy, so without
-        // --use-system-ca the FTPS connect + GitHub README fetch fail cert
-        // validation. `npm run deploy` passes this flag; the exe must too, or
+        // --use-system-ca TLS fails cert
+        // validation (FTPS connect, CDN gate). `npm run deploy` passes this flag; the exe must too, or
         // deploying through the published artifact (the primary launch path)
         // breaks while `npm run deploy` works.
         psi.ArgumentList.Add("--use-system-ca");
@@ -104,8 +79,8 @@ public sealed class DeployRunner
             AnsiConsole.MarkupLine("[grey]  ftp:  MindAttic.Vault (%APPDATA%\\MindAttic\\Ftp\\ftp.json)[/]");
         }
 
-        // Escape the joined args / repo path: a forwarded value (a --ref, or a
-        // --siblings-root/--themes-root path) can contain '[', which AnsiConsole
+        // Escape the joined args / repo path: a forwarded value (a slug, or the
+        // repo path) can contain '[', which AnsiConsole
         // would parse as a markup tag and throw on, aborting before node runs.
         AnsiConsole.MarkupLine($"[grey]> node --use-system-ca {Markup.Escape(string.Join(' ', args))}[/]");
         AnsiConsole.MarkupLine($"[grey]  cwd: {Markup.Escape(_repoRoot)}[/]");

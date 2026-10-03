@@ -655,6 +655,24 @@ test('cli: linked-only modifiers are rejected where they would be silently ignor
     assert.equal(r.status, 2);
 });
 
+test('cli: catalog mode is retired (DEP-A6) -- a bare run and the old catalog flags exit 2', () => {
+    const node = process.execPath;
+    const script = path.join(__dirname, '..', 'src', 'deploy.js');
+    let r = spawnSync(node, [script], { encoding: 'utf8' });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /no mode given/);
+    r = spawnSync(node, [script, '--dry-run'], { encoding: 'utf8' });
+    assert.equal(r.status, 2, '--dry-run alone no longer previews a catalog deploy');
+    for (const f of ['--only', '--skip-build', '--from-github']) {
+        r = spawnSync(node, [script, f, 'x'], { encoding: 'utf8' });
+        assert.equal(r.status, 2, `${f} is rejected`);
+        assert.match(r.stderr, /unknown flag/);
+    }
+    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'projects.json'), 'utf8'));
+    for (const k of ['projects', 'componentsVersion', 'ftpRemoteRoot']) assert.equal(cfg[k], undefined, `projects.json has no ${k}`);
+    for (const f of ['src/build.js', 'src/parts.js', 'template']) assert.ok(!fs.existsSync(path.join(__dirname, '..', f)), `${f} is gone`);
+});
+
 test('registry: the linked group is consistent with sites[] and only ships what the pages need', () => {
     const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'projects.json'), 'utf8'));
     const g = cfg.linkedGroups['mindattic-web'];

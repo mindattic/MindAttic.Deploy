@@ -5,10 +5,9 @@ using Spectre.Console.Cli;
 
 namespace MindAttic.Deploy.Cli.Commands;
 
-/// <summary>Default command (no args). Interactive multi-select prompt across catalog + sites + apps.</summary>
+/// <summary>Default command (no args). Interactive multi-select prompt across sites + apps.</summary>
 public sealed class MainMenuCommand : Command
 {
-    private const string CatalogPrefix = "catalog:";
     private const string SitePrefix    = "site:";
     private const string AppPrefix     = "app:";
 
@@ -27,11 +26,6 @@ public sealed class MainMenuCommand : Command
             .InstructionsText("[grey](nothing selected = exit without deploying)[/]")
             .UseConverter(LabelFor(roster.Config));
 
-        if (roster.Config.Projects.Count > 0)
-        {
-            prompt.AddChoiceGroup("Catalog landing pages (mindattic.com/<slug>.htm)",
-                roster.Config.Projects.Select(p => CatalogPrefix + p.Slug));
-        }
         if (roster.Config.Sites.Count > 0)
         {
             prompt.AddChoiceGroup("Root sites (verbatim FTP upload)",
@@ -50,23 +44,13 @@ public sealed class MainMenuCommand : Command
             return 0;
         }
 
-        var catalogPicks = picks.Where(p => p.StartsWith(CatalogPrefix)).Select(p => p[CatalogPrefix.Length..]).ToList();
-        var sitePicks    = picks.Where(p => p.StartsWith(SitePrefix))   .Select(p => p[SitePrefix.Length..])   .ToList();
-        var appPicks     = picks.Where(p => p.StartsWith(AppPrefix))    .Select(p => p[AppPrefix.Length..])    .ToList();
+        var sitePicks = picks.Where(p => p.StartsWith(SitePrefix)).Select(p => p[SitePrefix.Length..]).ToList();
+        var appPicks  = picks.Where(p => p.StartsWith(AppPrefix)) .Select(p => p[AppPrefix.Length..]) .ToList();
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[bold]Deploying {picks.Count} target(s) in {Batches(catalogPicks, sitePicks, appPicks, roster.Config)} batch(es)...[/]");
+        AnsiConsole.MarkupLine($"[bold]Deploying {picks.Count} target(s) in {Batches(sitePicks, appPicks, roster.Config)} batch(es)...[/]");
 
         int failed = 0;
-
-        if (catalogPicks.Count > 0)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule($"[cyan]catalog: {Markup.Escape(string.Join(", ", catalogPicks))}[/]").LeftJustified());
-            // One node invocation builds all selected slugs once, then uploads each.
-            int code = runner.RunCatalog(catalogPicks, skipBuild: false, dryRun: false);
-            if (code != 0) { failed++; AnsiConsole.MarkupLine($"[red]Exit {code}[/]"); }
-        }
 
         if (sitePicks.Count > 0)
         {
@@ -137,10 +121,9 @@ public sealed class MainMenuCommand : Command
         return 0;
     }
 
-    private static int Batches(List<string> catalog, List<string> sites, List<string> apps, DeployConfig cfg)
+    private static int Batches(List<string> sites, List<string> apps, DeployConfig cfg)
     {
         int n = 0;
-        if (catalog.Count > 0) n += 1;
         if (sites.Count > 0)   n += sites.Count == cfg.Sites.Count ? 1 : sites.Count;
         if (apps.Count > 0)    n += apps.Count == cfg.Apps.Count ? 1 : apps.Count;
         return n;
@@ -148,13 +131,6 @@ public sealed class MainMenuCommand : Command
 
     private static Func<string, string> LabelFor(DeployConfig cfg) => key =>
     {
-        if (key.StartsWith(CatalogPrefix))
-        {
-            var slug = key[CatalogPrefix.Length..];
-            var p = cfg.Projects.FirstOrDefault(x => x.Slug == slug);
-            var theme = p?.Theme is { Length: > 0 } t ? $" [grey]({t})[/]" : "";
-            return $"{slug}{theme}";
-        }
         if (key.StartsWith(SitePrefix))
         {
             var slug = key[SitePrefix.Length..];

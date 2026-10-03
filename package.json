@@ -2,16 +2,13 @@
   "name": "mindattic-deploy",
   "private": true,
   "version": "1.0.0",
-  "description": "Single-source generator and FTPS deployer for every MindAttic site (catalog landing pages, subfolder guides, root sites).",
+  "description": "FTPS deployer for MindAttic root sites (linked UiUx package + sites) and push-to-deploy trigger for Blazor apps.",
   "scripts": {
-    "build": "node src/build.js",
     "test": "node --test \"test/*.test.js\"",
     "deploy": "node --use-system-ca src/deploy.js",
-    "all": "node --use-system-ca src/deploy.js && node --use-system-ca src/deploy.js --sites && node --use-system-ca src/deploy.js --apps --include-disabled"
+    "all": "node --use-system-ca src/deploy.js --sites && node --use-system-ca src/deploy.js --apps --include-disabled"
   },
   "dependencies": {
-    "basic-ftp": "^5.0.5",
-    "highlight.js": "^11.9.0",
-    "marked": "^4.3.0"
+    "basic-ftp": "^5.0.5"
   }
 }
