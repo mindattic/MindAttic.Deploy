@@ -573,3 +573,101 @@ test('CDN failures are grouped by reason and capped (a wall of 404s stays readab
     assert.match(d.text(), /7 x HTTP 404/);
     assert.match(d.text(), /\.\.\.and 1 more/);
 });
+
+// --- audit fixes (DEP-A4) ---------------------------------------------------
+
+test('preflight: a stray local-only tag that is not at HEAD aborts (it would leave a gap in V1..Vn)', async () => {
+    const w = makeWorld();
+    addCommit(w, 'first');
+    git(w.pkg, 'tag', '-a', 'V2', '-m', 'never pushed');   // an earlier publish whose push failed...
+    addCommit(w, 'second');                                // ...and then HEAD moved on
+    const d = makeDeps(w, null);
+    const res = await run(w, d.deps);
+    assert.equal(res.aborted, true);
+    assert.match(d.text(), /tag V2 exists locally but not on origin, and is not at HEAD/);
+    assert.equal(git(w.pkg, 'tag', '--list', 'V3'), '', 'did not skip ahead to V3');
+    assert.equal(git(w.origin, 'tag', '--list'), 'V1');
+    assert.equal(d.calls.deploy.length, 0);
+});
+
+test('publish: a rejected push aborts cleanly (nothing uploaded); the next run resumes from the local tag', async () => {
+    const w = makeWorld();
+    addCommit(w);
+    // origin refuses every push
+    const hook = path.join(w.origin, 'hooks', 'pre-receive');
+    write(hook, '#!/bin/sh\necho "push refused by test" >&2\nexit 1\n');
+    fs.chmodSync(hook, 0o755);
+    const cdn = await startCdn(w.pkg);
+    let d = makeDeps(w, cdn);
+    let res = await run(w, d.deps);
+    assert.equal(res.ok, false);
+    assert.equal(res.aborted, true, 'a clean LinkedAbort, not a crash');
+    assert.match(d.text(), /\[ABORT\] git push origin main was rejected/);
+    assert.match(d.text(), /Nothing was uploaded/);
+    assert.equal(d.calls.deploy.length, 0);
+    assert.equal(git(w.pkg, 'tag', '--list', 'V2'), 'V2', 'tag kept locally');
+    assert.equal(git(w.origin, 'tag', '--list'), 'V1', 'nothing reached origin');
+
+    fs.rmSync(hook);                                        // origin accepts pushes again
+    d = makeDeps(w, cdn);
+    res = await run(w, d.deps);
+    await cdn.close();
+    assert.equal(res.ok, true, d.text());
+    assert.equal(res.tag, 'V2', 'resumed with the same tag, did not skip to V3');
+    assert.ok(!/tag -a V2/.test(d.text()), 'did not try to re-create the tag');
+    assert.match(git(w.origin, 'tag', '--list'), /V2/);
+    assert.equal(git(w.pkg, 'tag', '--list', 'V3'), '');
+});
+
+test('FTP: a site failure that closes the connection triggers a reconnect for the next site', async () => {
+    const w = makeWorld();
+    addCommit(w);
+    const cdn = await startCdn(w.pkg);
+    const d = makeDeps(w, cdn);
+    let made = 0;
+    d.deps.createClient = () => { made++; return { closed: false, close() { this.closed = true; d.calls.closed++; } }; };
+    d.deps.deployOneSite = async (client, site) => {
+        d.calls.deploy.push({ slug: site.slug, client });
+        if (client.closed) throw new Error('Client is closed');
+        if (site.slug === 'b.test') { client.closed = true; throw new Error('connection reset'); }
+        return { uploaded: 1, failed: 0 };
+    };
+    const res = await run(w, d.deps);
+    await cdn.close();
+    assert.equal(res.ok, false, 'b.test failed');
+    assert.deepEqual(res.sites.map((s) => [s.slug, !!s.error]), [['a.test', false], ['b.test', true], ['c.test', false]], 'c.test still deployed');
+    assert.equal(made, 2, 'a second client was created');
+    assert.equal(d.calls.accessed, 2, 'reconnected once');
+    assert.notEqual(d.calls.deploy[2].client, d.calls.deploy[1].client);
+    assert.match(d.text(), /reconnecting/);
+});
+
+test('cli: linked-only modifiers are rejected where they would be silently ignored', () => {
+    const node = process.execPath;
+    const script = path.join(__dirname, '..', 'src', 'deploy.js');
+    let r = spawnSync(node, [script, '--no-link', '--dry-run'], { encoding: 'utf8' });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /--no-link only applies with --site/);
+    r = spawnSync(node, [script, '--with-tests', '--dry-run'], { encoding: 'utf8' });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /--with-tests only applies to a linked deploy/);
+    r = spawnSync(node, [script, '--app', 'prose', '--with-tests', '--dry-run'], { encoding: 'utf8' });
+    assert.equal(r.status, 2);
+});
+
+test('registry: the linked group is consistent with sites[] and only ships what the pages need', () => {
+    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'projects.json'), 'utf8'));
+    const g = cfg.linkedGroups['mindattic-web'];
+    assert.ok(g && g.package && g.package.sourceDir, 'group has a package');
+    assert.equal(g.package.tagPrefix, undefined, 'no dead tagPrefix (whole-number V tags are hard-coded by law)');
+    const bySlug = new Map(cfg.sites.map((s) => [s.slug, s]));
+    for (const slug of g.sites) {
+        const s = bySlug.get(slug);
+        assert.ok(s, `${slug} is in sites[]`);
+        assert.deepEqual(s.files, ['index.htm'], `${slug} uploads only its page (no generated README.htm in production)`);
+        assert.equal(s.stampFile, 'index.htm');
+    }
+    const mc = bySlug.get('mindattic.com');
+    assert.ok(!mc.preDeploy.some((h) => (h.file || '').includes('fetch-descriptions')), 'dormant fetch-descriptions hook removed');
+    assert.ok(mc.preDeploy.some((h) => h.tagArg === '-CyberspaceCdnTag'), 'the Cyberspace splice receives the release tag');
+});

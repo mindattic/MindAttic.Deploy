@@ -280,6 +280,15 @@ function inspectPackage({ pkgDir, branch = 'main', remote = 'origin', fetch = fa
     const atHead = git(pkgDir, ['tag', '--points-at', 'HEAD']).stdout.split('\n').filter(Boolean);
     info.headTag = latestTag(atHead);
 
+    // A whole-number tag that exists only locally and is NOT at HEAD was created by an earlier run whose push
+    // failed (or by hand). Publishing past it would leave a permanent gap in the V1..Vn sequence (that tag would
+    // never reach origin), so stop and let a human publish or delete it. A local-only tag AT HEAD is fine: it is
+    // this run's release and gets pushed in step 2.
+    for (const t of sortTags(localTags)) {
+        if (rtags[t] || t === info.headTag) continue;
+        problems.push(`tag ${t} exists locally but not on ${remote}, and is not at HEAD -- an earlier publish never reached ${remote}. Push it (git push ${remote} ${t}) or delete it (git tag -d ${t}) before a linked deploy.`);
+    }
+
     if (info.latest) {
         const tagCommit = git(pkgDir, ['rev-parse', '--verify', '--quiet', `refs/tags/${info.latest}^{commit}`], { allowFail: true });
         const known = tagCommit.status === 0 ? tagCommit.stdout : (rtags[info.latest] && rtags[info.latest].commit);
@@ -331,19 +340,20 @@ function publishPackage({ pkgDir, info, remote = 'origin', branch = 'main', log 
     if (info.newTag) {
         const msg = buildTagMessage(pkgDir, tag, info.latest);
         log(`  [git]  tag -a ${tag}\n`);
-        git(pkgDir, ['tag', '-a', tag, '-m', msg]);
+        const t = git(pkgDir, ['tag', '-a', tag, '-m', msg], { allowFail: true });
+        if (t.status !== 0) throw new LinkedAbort(`git tag -a ${tag} failed: ${t.stderr || t.stdout}`);
     }
     if (info.ahead > 0) {
         log(`  [git]  push ${remote} ${branch}  (${info.ahead} commit(s))\n`);
         const p = git(pkgDir, ['push', remote, branch], { allowFail: true });
-        if (p.status !== 0) throw new Error(`git push ${remote} ${branch} was rejected: ${p.stderr}`);
+        if (p.status !== 0) throw new LinkedAbort(`git push ${remote} ${branch} was rejected: ${p.stderr}\n        The tag ${tag} exists locally only; the next run resumes from it.`);
     } else {
         log(`  [git]  ${branch} already on ${remote}; nothing to push\n`);
     }
     if (!info.releaseTagOnRemote) {
         log(`  [git]  push ${remote} ${tag}\n`);
         const p = git(pkgDir, ['push', remote, `refs/tags/${tag}`], { allowFail: true });
-        if (p.status !== 0) throw new Error(`git push ${remote} ${tag} was rejected: ${p.stderr}`);
+        if (p.status !== 0) throw new LinkedAbort(`git push ${remote} ${tag} was rejected: ${p.stderr}\n        The next run resumes from the local tag.`);
     } else {
         log(`  [git]  ${tag} already on ${remote} at HEAD; nothing to push\n`);
     }
@@ -686,9 +696,18 @@ async function runLinked(opts, deps) {
             client = deps.createClient();
             await deps.accessFtp(client, deps.loadFtpSettings());
         }
+        // A failed upload can leave the shared connection closed (basic-ftp marks the client `closed`); reconnect
+        // before the next site so one bad site does not make every later site fail with "Client is closed".
+        const ensureConnected = async () => {
+            if (dryRun || !client || !client.closed) return;
+            log(`  [ftp]  connection was closed by the previous failure; reconnecting\n`);
+            client = deps.createClient();
+            await deps.accessFtp(client, deps.loadFtpSettings());
+        };
         try {
             for (const site of plan.sites) {
                 try {
+                    await ensureConnected();
                     const r = await deps.deployOneSite(client, site, { skipHooks: true });
                     result.sites.push({ slug: site.slug, uploaded: r.uploaded, failed: r.failed, error: null });
                 } catch (e) {
@@ -699,10 +718,11 @@ async function runLinked(opts, deps) {
             // Other (non-group) sites requested via --sites go after the group, over the same connection.
             for (const site of plan.others || []) {
                 try {
+                    await ensureConnected();
                     const r = await deps.deployOneSite(client, site, {});
                     result.sites.push({ slug: site.slug, uploaded: r.uploaded, failed: r.failed, error: null, other: true });
                 } catch (e) {
-                    log(String.fromCharCode(10) + '  [SITE FAIL] ' + site.slug + ': ' + e.message + String.fromCharCode(10));
+                    log(`\n  [SITE FAIL] ${site.slug}: ${e.message}\n`);
                     result.sites.push({ slug: site.slug, uploaded: 0, failed: 1, error: e.message, other: true });
                 }
             }

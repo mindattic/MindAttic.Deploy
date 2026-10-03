@@ -55,7 +55,7 @@ public sealed class LinkedPackage
     [JsonPropertyName("sourceDir")] public string SourceDir { get; set; } = "";
     [JsonPropertyName("repo")]      public string Repo      { get; set; } = "";
     [JsonPropertyName("branch")]    public string Branch    { get; set; } = "main";
-    [JsonPropertyName("tagPrefix")] public string TagPrefix { get; set; } = "V";
+    [JsonPropertyName("remote")]    public string Remote    { get; set; } = "origin";
 }
 
 public sealed class CatalogProject

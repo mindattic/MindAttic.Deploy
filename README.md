@@ -423,7 +423,7 @@ logos, theme art and Cyberspace engine from it are **permanently linked**. The g
 ```jsonc
 "linkedGroups": {
   "mindattic-web": {
-    "package": { "slug": "MindAttic.UiUx", "sourceDir": "../MindAttic.UiUx", "repo": "mindattic/MindAttic.UiUx", "branch": "main", "remote": "origin", "tagPrefix": "V" },
+    "package": { "slug": "MindAttic.UiUx", "sourceDir": "../MindAttic.UiUx", "repo": "mindattic/MindAttic.UiUx", "branch": "main", "remote": "origin" },
     "sites":   ["ryandebraal.com", "mindatticcares.com", "mindattic.com"]   // FTP order
   }
 }
@@ -435,12 +435,12 @@ gate fails:
 
 | # | Step | What it does / checks |
 |---|---|---|
-| 1 | **Preflight** | Package repo is on `main` with a **clean working tree** (never auto-committed), `origin` reachable, not behind/diverged from `origin/main`, latest tag is an ancestor of `HEAD`, `tools\build-asset-manifest.ps1 -Verify` passes, every site's page exists, FTP secrets resolve, no page pins a tag newer than the release tag. |
+| 1 | **Preflight** | Package repo is on `main` with a **clean working tree** (never auto-committed), `origin` reachable, not behind/diverged from `origin/main`, latest tag is an ancestor of `HEAD`, no whole-number tag exists only locally (a leftover from a publish whose push failed — it would leave a gap in `V1..Vn`) unless it is at `HEAD`, `tools\build-asset-manifest.ps1 -Verify` passes, every site's page exists, FTP secrets resolve, no page pins a tag newer than the release tag. |
 | 2 | **Publish** | If `HEAD` already carries the latest `V<n>` tag it is reused; otherwise tag `V<n+1>` (annotated; message lists the commits since the last tag) and `git push origin main` + the tag. Never force. A tag that already exists on origin at a different commit aborts (tags are immutable). |
-| 3 | **Pin** | Every `MindAttic.UiUx@V<n>` in each site's `pinFiles` (default: its `stampFile`, i.e. `index.htm`) becomes the release tag. Idempotent; leaves npm and other jsDelivr URLs alone; a generated `README.htm` is uploaded but never pinned. |
+| 3 | **Pin** | Every `MindAttic.UiUx@V<n>` in each site's `pinFiles` (default: its `stampFile`, i.e. `index.htm`) becomes the release tag. Idempotent; leaves npm and other jsDelivr URLs alone. Uploaded files outside `pinFiles` are never pinned or scanned (none today: each linked site uploads only its `index.htm`). |
 | 4 | **Prepare** | Runs each site's `preDeploy` hooks. A powershell hook with `"tagArg": "-CyberspaceCdnTag"` receives the tag; the `uiux-pull` hook is skipped (step 1 already verified/published the package). |
 | 5 | **CDN gate** | Every UiUx URL the pages use must be live on jsDelivr at the release tag: HTTP 200, `access-control-allow-origin: *`, `content-length` equal to the file in the package tree. Checked: literal URLs **plus every file in `assets-manifest.json` under each site's domain folder** (so images a page builds at runtime from a base prefix like `ASSET_BASE + 'themes/…'` are covered). URLs ending in `/` are base prefixes and doc placeholders like `@<tag>/<path>` are ignored. New tags can lag: failures are retried in shared backoff rounds (~3 min). |
-| 6 | **FTP** | Uploads the sites in order over one connection (stamp + `files[]`). A failing site does not stop the rest; non-zero exit if any failed; `--sites` then deploys non-member sites. Prints a table and reminds you when a site repo has uncommitted/unpushed changes (the deploy never commits them). |
+| 6 | **FTP** | Uploads the sites in order over one connection (stamp + `files[]`), reconnecting if a failed site left it closed. A failing site does not stop the rest; non-zero exit if any failed; `--sites` then deploys non-member sites. Prints a table and reminds you when a site repo has uncommitted/unpushed changes (the deploy never commits them). |
 
 ```bash
 npm run deploy -- --site mindattic.com --dry-run   # read-only plan: [WOULD ABORT] lines show gates that would stop a real run
@@ -454,6 +454,9 @@ Things to know:
 - **Commit the package first.** A dirty `MindAttic.UiUx` tree aborts the run; commit your asset/component changes, then deploy.
 - **Pushing `main` of MindAttic.UiUx** can trigger its `sync-subscribers` GitHub workflow (it opens review PRs in subscriber repos; it merges nothing). Add `[skip ci]` to the package commit message to suppress it.
 - The package is published **before** the CDN gate (the gate needs the tag to exist). If the gate fails the tag stays (immutable) and nothing is uploaded; fix and re-run.
+- If a **push is rejected**, the run aborts cleanly (nothing uploaded) and the new tag stays local; the next run, with `HEAD` unchanged, resumes from it and pushes it.
+- `--no-link` requires `--site`/`--sites`, and `--with-tests` requires a linked deploy; both exit 2 otherwise instead of being silently ignored.
+- `mindattic.com` uploads only `index.htm` (its generated `README.htm` is repo documentation and is no longer published — see [DEP-A4](docs/AMENDMENTS.md#DEP-A4)). Its only hooks are `uiux-pull` (skipped inside the linked flow) and the Cyberspace splice; the dormant `fetch-descriptions.ps1` hook was removed.
 - `--dry-run` runs steps 1-5 read-only: no tag, push, pin edit, hook, FTP connect or upload. If the release tag is not published yet, it says the live CDN check "would run after the push".
 - Design record and rationale: [DEP-A3](docs/AMENDMENTS.md#DEP-A3). Tests: `npm test`.
 

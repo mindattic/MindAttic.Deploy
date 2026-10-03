@@ -166,6 +166,17 @@ try {
     process.exit(2);
 }
 
+// Linked-deploy modifiers are meaningless on their own; reject them instead of silently ignoring them
+// (e.g. `--no-link` in catalog mode would otherwise look like it did something).
+if (noLink && !siteSlug && !allSites) {
+    process.stderr.write(`deploy.js: --no-link only applies with --site <slug> or --sites.\n`);
+    process.exit(2);
+}
+if (withTests && !siteSlug && !allSites && !uiuxMode) {
+    process.stderr.write(`deploy.js: --with-tests only applies to a linked deploy (--site <member>, --sites or --uiux).\n`);
+    process.exit(2);
+}
+
 // Single FTPS connect path for both catalog and site mode. Validates the
 // server certificate by default; a legacy/self-signed host can opt out by
 // setting "rejectUnauthorized": false in secrets/ftp.json.
@@ -697,6 +708,9 @@ async function main() {
     } else if (siteSlug || allSites || uiuxMode) {
         const plan = require('./linked').planTargets(config, { siteSlug, allSites, uiux: uiuxMode, noLink });
         for (const w of plan.warnings) process.stdout.write(`\n  [WARN] ${w}\n`);
+        if (plan.kind !== 'linked' && withTests) {
+            throw new Error('--with-tests only applies to a linked deploy; this run is a plain site deploy (non-member site or --no-link).');
+        }
         if (plan.kind === 'linked') await runLinkedMode(config, plan);
         else await runSiteMode(config, plan.sites);
     } else {

@@ -504,7 +504,7 @@ docs/
 <p><code>MindAttic.UiUx</code> (the shared jsDelivr asset package) and the three sites that load their fonts, logos, theme art and Cyberspace engine from it are <strong>permanently linked</strong>. The group is declared in <code>projects.json</code> under <code>linkedGroups</code>:</p>
 <pre><code class="language-jsonc">"linkedGroups": {
   "mindattic-web": {
-    "package": { "slug": "MindAttic.UiUx", "sourceDir": "../MindAttic.UiUx", "repo": "mindattic/MindAttic.UiUx", "branch": "main", "remote": "origin", "tagPrefix": "V" },
+    "package": { "slug": "MindAttic.UiUx", "sourceDir": "../MindAttic.UiUx", "repo": "mindattic/MindAttic.UiUx", "branch": "main", "remote": "origin" },
     "sites":   ["ryandebraal.com", "mindatticcares.com", "mindattic.com"]   // FTP order
   }
 }</code></pre>
@@ -517,7 +517,7 @@ docs/
 <tr>
 <td>1</td>
 <td><strong>Preflight</strong></td>
-<td>Package repo is on <code>main</code> with a <strong>clean working tree</strong> (never auto-committed), <code>origin</code> reachable, not behind/diverged from <code>origin/main</code>, latest tag is an ancestor of <code>HEAD</code>, <code>tools\build-asset-manifest.ps1 -Verify</code> passes, every site's page exists, FTP secrets resolve, no page pins a tag newer than the release tag.</td>
+<td>Package repo is on <code>main</code> with a <strong>clean working tree</strong> (never auto-committed), <code>origin</code> reachable, not behind/diverged from <code>origin/main</code>, latest tag is an ancestor of <code>HEAD</code>, no whole-number tag exists only locally (a leftover from a publish whose push failed — it would leave a gap in <code>V1..Vn</code>) unless it is at <code>HEAD</code>, <code>tools\build-asset-manifest.ps1 -Verify</code> passes, every site's page exists, FTP secrets resolve, no page pins a tag newer than the release tag.</td>
 </tr>
 <tr>
 <td>2</td>
@@ -527,7 +527,7 @@ docs/
 <tr>
 <td>3</td>
 <td><strong>Pin</strong></td>
-<td>Every <code>MindAttic.UiUx@V&lt;n&gt;</code> in each site's <code>pinFiles</code> (default: its <code>stampFile</code>, i.e. <code>index.htm</code>) becomes the release tag. Idempotent; leaves npm and other jsDelivr URLs alone; a generated <code>README.htm</code> is uploaded but never pinned.</td>
+<td>Every <code>MindAttic.UiUx@V&lt;n&gt;</code> in each site's <code>pinFiles</code> (default: its <code>stampFile</code>, i.e. <code>index.htm</code>) becomes the release tag. Idempotent; leaves npm and other jsDelivr URLs alone. Uploaded files outside <code>pinFiles</code> are never pinned or scanned (none today: each linked site uploads only its <code>index.htm</code>).</td>
 </tr>
 <tr>
 <td>4</td>
@@ -542,7 +542,7 @@ docs/
 <tr>
 <td>6</td>
 <td><strong>FTP</strong></td>
-<td>Uploads the sites in order over one connection (stamp + <code>files[]</code>). A failing site does not stop the rest; non-zero exit if any failed; <code>--sites</code> then deploys non-member sites. Prints a table and reminds you when a site repo has uncommitted/unpushed changes (the deploy never commits them).</td>
+<td>Uploads the sites in order over one connection (stamp + <code>files[]</code>), reconnecting if a failed site left it closed. A failing site does not stop the rest; non-zero exit if any failed; <code>--sites</code> then deploys non-member sites. Prints a table and reminds you when a site repo has uncommitted/unpushed changes (the deploy never commits them).</td>
 </tr>
 </tbody></table>
 <pre><code class="language-bash">npm run deploy -- --site mindattic.com --dry-run   # read-only plan: [WOULD ABORT] lines show gates that would stop a real run
@@ -554,6 +554,9 @@ npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site onl
 <li><strong>Commit the package first.</strong> A dirty <code>MindAttic.UiUx</code> tree aborts the run; commit your asset/component changes, then deploy.</li>
 <li><strong>Pushing <code>main</code> of MindAttic.UiUx</strong> can trigger its <code>sync-subscribers</code> GitHub workflow (it opens review PRs in subscriber repos; it merges nothing). Add <code>[skip ci]</code> to the package commit message to suppress it.</li>
 <li>The package is published <strong>before</strong> the CDN gate (the gate needs the tag to exist). If the gate fails the tag stays (immutable) and nothing is uploaded; fix and re-run.</li>
+<li>If a <strong>push is rejected</strong>, the run aborts cleanly (nothing uploaded) and the new tag stays local; the next run, with <code>HEAD</code> unchanged, resumes from it and pushes it.</li>
+<li><code>--no-link</code> requires <code>--site</code>/<code>--sites</code>, and <code>--with-tests</code> requires a linked deploy; both exit 2 otherwise instead of being silently ignored.</li>
+<li><code>mindattic.com</code> uploads only <code>index.htm</code> (its generated <code>README.htm</code> is repo documentation and is no longer published — see <a href="docs/AMENDMENTS.md#DEP-A4">DEP-A4</a>). Its only hooks are <code>uiux-pull</code> (skipped inside the linked flow) and the Cyberspace splice; the dormant <code>fetch-descriptions.ps1</code> hook was removed.</li>
 <li><code>--dry-run</code> runs steps 1-5 read-only: no tag, push, pin edit, hook, FTP connect or upload. If the release tag is not published yet, it says the live CDN check "would run after the push".</li>
 <li>Design record and rationale: <a href="docs/AMENDMENTS.md#DEP-A3">DEP-A3</a>. Tests: <code>npm test</code>.</li>
 </ul>

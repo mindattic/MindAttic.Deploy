@@ -128,7 +128,7 @@
 
   "linkedGroups": {
     "mindattic-web": {
-      "package": { "slug": "MindAttic.UiUx", "sourceDir": "../MindAttic.UiUx", "repo": "mindattic/MindAttic.UiUx", "branch": "main", "remote": "origin", "tagPrefix": "V" },
+      "package": { "slug": "MindAttic.UiUx", "sourceDir": "../MindAttic.UiUx", "repo": "mindattic/MindAttic.UiUx", "branch": "main", "remote": "origin" },
       "sites":   ["ryandebraal.com", "mindatticcares.com", "mindattic.com"]
     }
   },
@@ -138,12 +138,11 @@
       "slug":          "mindattic.com",
       "sourceDir":     "../mindattic.com",
       "ftpRemotePath": "/mindattic.com",
-      "files":         ["*.htm"],
+      "files":         ["index.htm"],
       "stampFile":     "index.htm",
       "preDeploy": [
         { "kind": "uiux-pull",  "required": true },
-        { "kind": "powershell", "file": "../MindAttic.UiUx/sync/sync-mindattic-com.ps1", "args": ["-TargetIndex", "../mindattic.com/index.htm"], "tagArg": "-CyberspaceCdnTag", "required": true },
-        { "kind": "powershell", "file": "../mindattic.com/fetch-descriptions.ps1", "required": false }
+        { "kind": "powershell", "file": "../MindAttic.UiUx/sync/sync-mindattic-com.ps1", "args": ["-TargetIndex", "../mindattic.com/index.htm"], "tagArg": "-CyberspaceCdnTag", "required": true }
       ]
     },
     {

@@ -13,6 +13,40 @@ updated: 2026-10-02
 > grows beyond ~25, fold the settled ones into [BIBLE.md](BIBLE.md) and start a new epoch (note the
 > git tag) — full history stays in git.
 
+## DEP-A4 — Linked-deploy audit fixes; mindattic.com ships only its page (supersedes DEP-A3's fetch-descriptions bullet) {#DEP-A4}
+**What changed** (audit after the first real linked deploy, which published `V7`, 2026-10-02):
+1. **Stray local tags.** Preflight now aborts if a whole-number tag exists only locally and is not at `HEAD`
+   (left behind by a publish whose push failed, then `HEAD` moved). Previously the run computed the next
+   number past it, so that tag would never reach origin and `V1..Vn` would have a permanent gap. A
+   local-only tag *at* `HEAD` is still this run's release and is pushed. (`src/linked.js` `inspectPackage`.)
+2. **Clean publish failures.** A failed `git tag` or a rejected `git push` is now a `LinkedAbort`
+   (`[ABORT] ... Nothing was uploaded`, exit 1) instead of an unhandled error; the next run, with `HEAD`
+   unchanged, resumes from the local tag instead of minting a new one.
+3. **FTP reconnect.** A site whose upload leaves the shared connection closed no longer makes every later
+   site fail with "Client is closed": the flow reconnects before the next site.
+4. **Flag validation.** `--no-link` without `--site`/`--sites`, and `--with-tests` outside a linked deploy,
+   now exit 2 instead of being silently ignored.
+5. **Registry.** `mindattic.com` uploads only `index.htm` (was `*.htm`, which also published the repo's
+   generated `README.htm` documentation to `/mindattic.com/README.htm` — seen in the 2026-10-02 run; that file
+   exists in the repo since 2026-08-14); the dormant
+   `fetch-descriptions.ps1` hook was removed (its output, `data/*.json`, is no longer read by the page,
+   and running it left the mindattic.com repo dirty after every deploy); the unused `tagPrefix` key was
+   dropped (whole-number `V<n>` tags are fixed by law, the code never read it).
+
+**Not changed (recommendation).** `componentsVersion` (catalog landing pages) stays `V4`. Evidence that
+`V7` is safe: `Themes/Cyberspace/{deps.json,theme.css,body-prelude.html}` are identical V4→V7; the theme's
+component files differ only by a comment (`frontpage.css`), the genuine Outfit Latin font
+(`outfit-font.css`, previously corrupt) and additive host switches in `console-bg.js`; textures are
+pixel-identical but 6.2 → 1.7 MB; a local `node src/build.js --only idiotproof --components V7` rendered
+and all 13 of its `@V7` URLs returned 200. Bumping it changes every catalog landing page on the next catalog deploy,
+which is a separate decision.
+
+**Cleanup the deploy cannot do.** `mindattic.com/README.htm` uploaded by earlier deploys is still on the
+FTP host; delete it by hand (the deploy never deletes remote files).
+
+**Migration.** None. `npm test` → 29 tests (5 new: stray tag, rejected push + resume, FTP reconnect,
+flag validation, registry consistency).
+
 ## DEP-A3 — Linked deploy: MindAttic.UiUx + ryandebraal.com + mindatticcares.com + mindattic.com deploy as one (refines DEP-LAW-2 and DEP-LAW-4; supersedes the README's "UiUx is out of scope" note) {#DEP-A3}
 **Decision (user, 2026-10-02):** "Now that these are permanently linked the /deploy for MindAttic.UiUx, ryandebraal.com, mindattic.com, mindatticcares.com needs to all deploy each other all at once each time any one of them is deployed."
 
