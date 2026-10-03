@@ -1,23 +1,29 @@
 /**
  * linked.js -- linked-group deploy.
  *
- * MindAttic.UiUx (the shared jsDelivr asset package) and the three sites that
- * consume it (ryandebraal.com, mindatticcares.com, mindattic.com) are PERMANENTLY
- * linked: deploying any one of them deploys all four, in this order:
+ * The MindAttic.Web monorepo holds the shared jsDelivr asset package (the MindAttic.Web.Shared folder, the
+ * group's `package.cdnSubpath`) AND the sites that consume it (ryandebraal.com, mindatticcares.com, Hyperspace,
+ * mindattic.com) as sibling folders of ONE git repo. They are PERMANENTLY linked: deploying any one of them
+ * deploys all of them, in this order:
  *
- *   1. preflight   package repo clean, on main, not behind origin, tag sane,
- *                  manifest current, site sources present, FTP secrets resolvable
- *   2. publish     tag the package (V<n+1> if HEAD is ahead of the latest tag),
- *                  push main + the tag (never force, tags are immutable)
- *   3. pin         rewrite every `MindAttic.UiUx@V<n>` in the sites to the release tag
- *   4. prepare     run each site's preDeploy hooks (the sync splice gets the tag)
- *   5. CDN gate    every asset the sites use must be live on jsDelivr at that tag with
- *                  the exact bytes -- aborts BEFORE any FTP upload if anything is missing
- *   6. FTP         upload the sites in order, continue past a failed site, report a table
+ *   1. preflight   repo clean, on main, not behind origin, tags sane, manifest current,
+ *                  site sources present (inside the repo), FTP secrets resolvable
+ *   2. tag         compute the release tag: the next V<n> (or package.firstTag when the repo has no
+ *                  whole-number tag yet). If HEAD already carries the latest tag and every site page is
+ *                  already pinned to it, that tag is REUSED and steps 3-5 are skipped.
+ *   3. prepare     rewrite every package pin in the site pages to the release tag, run each site's
+ *                  preDeploy hooks (the sync splice gets the tag), stamp each site's stampFile
+ *   4. commit      commit those site changes: "Pin <package slug> V<n>" (only files inside the sites' folders)
+ *   5. tag         annotate-tag that commit
+ *   6. push        push main and the tag (never force; tags are immutable)
+ *   7. CDN gate    every asset the sites use must be live on jsDelivr at that tag with the exact bytes --
+ *                  aborts BEFORE any FTP upload if anything is missing
+ *   8. FTP         upload the sites in order, continue past a failed site, report a table
  *
- * Everything with a side effect is injected through `deps`, so the orchestration
- * is testable against throwaway git repos, a local http server and a fake FTP client.
- * deploy.js wires the real implementations; nothing here talks to FTP directly.
+ * A dry run changes nothing: no fetch, no hook, no write, no commit, no tag, no push, no FTP connect.
+ *
+ * Everything with a side effect is injected through `deps`, so the orchestration is testable against
+ * throwaway git repos, a local http server and a fake FTP client. deploy.js wires the real implementations.
  */
 
 'use strict';
@@ -51,6 +57,13 @@ function nextTag(tag) {
     const n = parseTag(tag);
     if (n === null) throw new Error(`not a whole-number tag: ${tag}`);
     return `V${n + 1}`;
+}
+
+/** The tag a new release gets: latest+1, never below `firstTag` (the repo's starting number). */
+function releaseTagAfter(latest, firstTag) {
+    const floor = firstTag && parseTag(firstTag) !== null ? parseTag(firstTag) : 1;
+    const n = latest ? parseTag(latest) + 1 : floor;
+    return `V${Math.max(n, floor)}`;
 }
 
 // --- planning: which targets does a flag combination mean? ------------------
@@ -101,7 +114,7 @@ function planTargets(config, { siteSlug, allSites, uiux, noLink }) {
             return { kind: 'linked', groupName: g.name, group: g.group, sites: groupSites(g.group), others: [], warnings };
         }
         if (g && noLink) {
-            warnings.push(`--no-link: deploying '${siteSlug}' ALONE. It is permanently linked to ${g.group.package.slug} and ${g.group.sites.filter((s) => s !== siteSlug).join(', ')}; their pinned asset tag may now disagree with this page.`);
+            warnings.push(`--no-link: deploying '${siteSlug}' ALONE. It is permanently linked to ${g.group.package.slug} and ${g.group.sites.filter((s) => s !== siteSlug).join(', ')}; their pinned asset tag may now disagree with this page, and the stamp it writes is left uncommitted.`);
         }
         return { kind: 'plain', sites: [site], warnings };
     }
@@ -112,22 +125,45 @@ function planTargets(config, { siteSlug, allSites, uiux, noLink }) {
             const inGroup = new Set(g.group.sites);
             return { kind: 'linked', groupName: g.name, group: g.group, sites: groupSites(g.group), others: sites.filter((s) => !inGroup.has(s.slug)), warnings };
         }
-        if (g && noLink) warnings.push('--no-link: deploying every site WITHOUT the linked-group publish/pin/CDN gate.');
+        if (g && noLink) warnings.push('--no-link: deploying every site WITHOUT the linked-group pin/commit/tag/CDN gate.');
         return { kind: 'plain', sites, warnings };
     }
 
     throw new Error('planTargets called without a site-mode flag.');
 }
 
-// --- pins -------------------------------------------------------------------
+// --- CDN spec / pins --------------------------------------------------------
 
-const PIN_RE = /(cdn\.jsdelivr\.net\/gh\/mindattic\/MindAttic\.UiUx@)(V\d+)/g;
-const URL_RE = /https:\/\/cdn\.jsdelivr\.net\/gh\/mindattic\/MindAttic\.UiUx@([A-Za-z0-9._-]+)\/([^\s"'`)<>\\]*)/g;
+const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-/** Rewrite every UiUx tag pin to `tag`. Idempotent; leaves other jsDelivr URLs (npm, other repos) alone. */
-function rewritePins(text, tag) {
+/**
+ * Where the package lives on jsDelivr: `https://cdn.jsdelivr.net/gh/<repo>@<tag>/<subpath>/<file>`.
+ * `pkg` is a linkedGroups package entry ({ repo, cdnSubpath }) or an already-built spec ({ repo, subpath }).
+ */
+function cdnSpec(pkg) {
+    if (!pkg || !pkg.repo) throw new Error('linked package needs a `repo` (owner/name) to build CDN URLs.');
+    const raw = pkg.subpath !== undefined ? pkg.subpath : (pkg.cdnSubpath || '');
+    return { repo: pkg.repo, subpath: String(raw).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') };
+}
+
+function cdnBase(spec, tag) {
+    return `https://cdn.jsdelivr.net/gh/${spec.repo}@${tag}/${spec.subpath ? spec.subpath + '/' : ''}`;
+}
+
+function pinRegex(spec) {
+    const sub = spec.subpath ? esc(spec.subpath) + '\\/' : '';
+    return new RegExp(`(cdn\\.jsdelivr\\.net\\/gh\\/${esc(spec.repo)}@)(V\\d+)(?=\\/${sub})`, 'g');
+}
+
+function urlRegex(spec) {
+    const sub = spec.subpath ? esc(spec.subpath) + '\\/' : '';
+    return new RegExp(`https:\\/\\/cdn\\.jsdelivr\\.net\\/gh\\/${esc(spec.repo)}@([A-Za-z0-9._-]+)\\/${sub}([^\\s"'\`)<>\\\\]*)`, 'g');
+}
+
+/** Rewrite every package tag pin (`gh/<repo>@V<n>/<subpath>/`) to `tag`. Idempotent; leaves other jsDelivr URLs alone. */
+function rewritePins(text, tag, spec) {
     const changes = [];
-    const out = text.replace(PIN_RE, (m, pre, old, offset) => {
+    const out = text.replace(pinRegex(spec), (m, pre, old, offset) => {
         if (old !== tag) {
             const line = text.slice(0, offset).split('\n').length;
             changes.push({ from: old, to: tag, line });
@@ -137,19 +173,19 @@ function rewritePins(text, tag) {
     return { text: out, changes };
 }
 
-/** Every UiUx URL in a text. `isPrefix` = the URL is a directory-like base (ends in '/'), not a file. */
-function collectUiuxUrls(text) {
+/** Every package URL in a text. `isPrefix` = the URL is a directory-like base (ends in '/'), not a file. */
+function collectPackageUrls(text, spec) {
     const seen = new Map();
+    const re = urlRegex(spec);
     let m;
-    URL_RE.lastIndex = 0;
-    while ((m = URL_RE.exec(text)) !== null) {
+    while ((m = re.exec(text)) !== null) {
         const tag = m[1];
         let rel = m[2];
         // A trailing sentence/JS punctuation char is never part of a path here.
         rel = rel.replace(/[;,]+$/, '');
         let decoded;
         try { decoded = decodeURIComponent(rel); } catch (_) { decoded = rel; }
-        const url = `https://cdn.jsdelivr.net/gh/mindattic/MindAttic.UiUx@${tag}/${rel}`;
+        const url = cdnBase(spec, tag) + rel;
         if (!seen.has(url)) {
             // `@<tag>/<path>`, `{{x}}`, `${x}`, `*` ... are examples/templates, not references to a real file.
             const isTemplate = /[<>{}$*]|&lt;|&gt;|%3C|%3E|%7B/i.test(rel) || /[<>{}$*]|&lt;|&gt;/i.test(tag);
@@ -159,8 +195,8 @@ function collectUiuxUrls(text) {
     return [...seen.values()];
 }
 
-function cdnUrl(tag, relPath) {
-    return `https://cdn.jsdelivr.net/gh/mindattic/MindAttic.UiUx@${tag}/` + relPath.split('/').map(encodeURIComponent).join('/');
+function cdnUrl(spec, tag, relPath) {
+    return cdnBase(spec, tag) + relPath.split('/').map(encodeURIComponent).join('/');
 }
 
 // --- git --------------------------------------------------------------------
@@ -176,9 +212,9 @@ function git(cwd, args, opts = {}) {
     return out;
 }
 
-function remoteTags(pkgDir, remote) {
+function remoteTags(repoDir, remote) {
     // { 'V7': { sha, peeled } } -- peeled = the commit an annotated tag points at.
-    const r = git(pkgDir, ['ls-remote', '--tags', remote], { allowFail: true });
+    const r = git(repoDir, ['ls-remote', '--tags', remote], { allowFail: true });
     if (r.status !== 0) return null;
     const tags = {};
     for (const line of r.stdout.split('\n')) {
@@ -191,47 +227,59 @@ function remoteTags(pkgDir, remote) {
     return tags;
 }
 
-function buildTagMessage(pkgDir, tag, prev) {
+function buildTagMessage(repoDir, tag, prev) {
     const range = prev ? `${prev}..HEAD` : 'HEAD';
-    const r = git(pkgDir, ['log', '--pretty=%s', range], { allowFail: true });
+    const r = git(repoDir, ['log', '--pretty=%s', range], { allowFail: true });
     const subjects = r.status === 0 && r.stdout ? r.stdout.split('\n') : [];
     const shown = subjects.slice(0, 20).map((s) => `- ${s}`);
     if (subjects.length > 20) shown.push(`- ...and ${subjects.length - 20} more`);
     return `${tag} -- published by MindAttic.Deploy\n\n${shown.join('\n') || '(no commits listed)'}`;
 }
 
+/** Paths reported by `git status --porcelain` (repo-relative, forward slashes; rename targets). */
+function porcelainPaths(repoDir) {
+    const out = git(repoDir, ['status', '--porcelain', '--untracked-files=all'], { raw: true }).stdout;
+    if (!out) return [];
+    return out.split('\n').filter(Boolean).map((l) => {
+        let p = l.slice(3);
+        if (p.includes(' -> ')) p = p.split(' -> ')[1];
+        if (p.startsWith('"') && p.endsWith('"')) p = p.slice(1, -1);
+        return p;
+    });
+}
+
 // --- preflight --------------------------------------------------------------
 
 /**
- * Inspect the package repo. Never mutates anything unless `fetch` is true (real runs fetch tags so
+ * Inspect the monorepo. Never mutates anything unless `fetch` is true (real runs fetch tags so
  * "behind origin" is judged against fresh data; dry-runs use ls-remote only so they write nothing).
- * Returns { problems: [string], info: {...} }.
+ * Returns { problems: [string], info: {...} }. The release tag is decided later (it depends on the pins).
  */
-function inspectPackage({ pkgDir, branch = 'main', remote = 'origin', fetch = false }) {
+function inspectRepo({ repoDir, branch = 'main', remote = 'origin', fetch = false, firstTag = null }) {
     const problems = [];
-    const info = { pkgDir, branch, remote };
+    const info = { repoDir, branch, remote };
 
-    if (!fs.existsSync(pkgDir) || git(pkgDir, ['rev-parse', '--is-inside-work-tree'], { allowFail: true }).stdout !== 'true') {
-        problems.push(`package dir is not a git repo: ${pkgDir}`);
+    if (!fs.existsSync(repoDir) || git(repoDir, ['rev-parse', '--is-inside-work-tree'], { allowFail: true }).stdout !== 'true') {
+        problems.push(`package repo dir is not a git repo: ${repoDir}`);
         return { problems, info };
     }
 
-    info.head = git(pkgDir, ['rev-parse', 'HEAD']).stdout;
-    info.currentBranch = git(pkgDir, ['rev-parse', '--abbrev-ref', 'HEAD']).stdout;
+    info.head = git(repoDir, ['rev-parse', 'HEAD']).stdout;
+    info.currentBranch = git(repoDir, ['rev-parse', '--abbrev-ref', 'HEAD']).stdout;
     if (info.currentBranch !== branch) {
-        problems.push(`package repo is on '${info.currentBranch}', not '${branch}' -- switch to ${branch} before a linked deploy.`);
+        problems.push(`repo is on '${info.currentBranch}', not '${branch}' -- switch to ${branch} before a linked deploy.`);
     }
 
-    const dirty = git(pkgDir, ['status', '--porcelain'], { raw: true }).stdout;
+    const dirty = git(repoDir, ['status', '--porcelain'], { raw: true }).stdout;
     info.dirty = dirty ? dirty.split('\n') : [];
     if (info.dirty.length) {
         const shown = info.dirty.slice(0, 15).join('\n    ');
-        problems.push(`package repo has ${info.dirty.length} uncommitted change(s) (deploy never auto-commits -- commit or discard them first):\n    ${shown}${info.dirty.length > 15 ? `\n    ...and ${info.dirty.length - 15} more` : ''}`);
+        problems.push(`repo has ${info.dirty.length} uncommitted change(s) (deploy commits only its own pin/stamp changes -- commit or discard these first):\n    ${shown}${info.dirty.length > 15 ? `\n    ...and ${info.dirty.length - 15} more` : ''}`);
     }
 
-    const rtags = remoteTags(pkgDir, remote);
+    const rtags = remoteTags(repoDir, remote);
     if (rtags === null) {
-        problems.push(`cannot reach '${remote}' (git ls-remote failed) -- the package must be pushed to GitHub for jsDelivr to serve it.`);
+        problems.push(`cannot reach '${remote}' (git ls-remote failed) -- the repo must be pushed to GitHub for jsDelivr to serve it.`);
         info.remoteReachable = false;
         return { problems, info };
     }
@@ -243,7 +291,7 @@ function inspectPackage({ pkgDir, branch = 'main', remote = 'origin', fetch = fa
     const tagMismatch = [];
     for (const [name, rt] of Object.entries(rtags)) {
         if (parseTag(name) === null) continue;
-        const lc = git(pkgDir, ['rev-parse', '--verify', '--quiet', `refs/tags/${name}^{commit}`], { allowFail: true });
+        const lc = git(repoDir, ['rev-parse', '--verify', '--quiet', `refs/tags/${name}^{commit}`], { allowFail: true });
         if (lc.status === 0 && lc.stdout !== rt.commit) tagMismatch.push({ name, local: lc.stdout, remote: rt.commit });
     }
     for (const m of tagMismatch) {
@@ -251,114 +299,72 @@ function inspectPackage({ pkgDir, branch = 'main', remote = 'origin', fetch = fa
     }
 
     if (fetch && tagMismatch.length === 0) {
-        const f = git(pkgDir, ['fetch', remote, '--tags'], { allowFail: true });
+        const f = git(repoDir, ['fetch', remote, '--tags'], { allowFail: true });
         if (f.status !== 0) problems.push(`git fetch ${remote} --tags failed: ${f.stderr || f.stdout || '(no output)'}`);
     }
 
     // Remote main vs local HEAD.
-    const rm = git(pkgDir, ['ls-remote', remote, `refs/heads/${branch}`], { allowFail: true });
+    const rm = git(repoDir, ['ls-remote', remote, `refs/heads/${branch}`], { allowFail: true });
     const remoteMain = rm.status === 0 && rm.stdout ? rm.stdout.split(/\s+/)[0] : null;
     info.remoteMain = remoteMain;
     info.ahead = 0;
     if (remoteMain && remoteMain !== info.head) {
-        const haveObj = git(pkgDir, ['cat-file', '-e', `${remoteMain}^{commit}`], { allowFail: true }).status === 0;
-        const isAncestor = haveObj && git(pkgDir, ['merge-base', '--is-ancestor', remoteMain, 'HEAD'], { allowFail: true }).status === 0;
+        const haveObj = git(repoDir, ['cat-file', '-e', `${remoteMain}^{commit}`], { allowFail: true }).status === 0;
+        const isAncestor = haveObj && git(repoDir, ['merge-base', '--is-ancestor', remoteMain, 'HEAD'], { allowFail: true }).status === 0;
         if (!isAncestor) {
             problems.push(`local ${branch} is BEHIND or has DIVERGED from ${remote}/${branch} (${remoteMain.slice(0, 8)}${haveObj ? '' : ', not present locally'}) -- pull/merge first.`);
         } else {
-            info.ahead = parseInt(git(pkgDir, ['rev-list', '--count', `${remoteMain}..HEAD`]).stdout, 10);
+            info.ahead = parseInt(git(repoDir, ['rev-list', '--count', `${remoteMain}..HEAD`]).stdout, 10);
         }
     } else if (!remoteMain) {
         // Remote has no main yet: everything is "ahead".
-        info.ahead = parseInt(git(pkgDir, ['rev-list', '--count', 'HEAD']).stdout, 10);
+        info.ahead = parseInt(git(repoDir, ['rev-list', '--count', 'HEAD']).stdout, 10);
     }
 
     // Tags: union of local and remote whole-number tags.
-    const localTags = git(pkgDir, ['tag', '--list']).stdout.split('\n').filter(Boolean);
+    const localTags = git(repoDir, ['tag', '--list']).stdout.split('\n').filter(Boolean);
     const all = [...new Set([...localTags, ...Object.keys(rtags)])];
     info.latest = latestTag(all);
-    const atHead = git(pkgDir, ['tag', '--points-at', 'HEAD']).stdout.split('\n').filter(Boolean);
+    const atHead = git(repoDir, ['tag', '--points-at', 'HEAD']).stdout.split('\n').filter(Boolean);
     info.headTag = latestTag(atHead);
+    info.nextTag = releaseTagAfter(info.latest, firstTag);
 
     // A whole-number tag that exists only locally and is NOT at HEAD was created by an earlier run whose push
-    // failed (or by hand). Publishing past it would leave a permanent gap in the V1..Vn sequence (that tag would
+    // failed (or by hand). Publishing past it would leave a permanent gap in the tag sequence (that tag would
     // never reach origin), so stop and let a human publish or delete it. A local-only tag AT HEAD is fine: it is
-    // this run's release and gets pushed in step 2.
+    // an earlier run's release and gets pushed when it is reused.
     for (const t of sortTags(localTags)) {
         if (rtags[t] || t === info.headTag) continue;
         problems.push(`tag ${t} exists locally but not on ${remote}, and is not at HEAD -- an earlier publish never reached ${remote}. Push it (git push ${remote} ${t}) or delete it (git tag -d ${t}) before a linked deploy.`);
     }
 
     if (info.latest) {
-        const tagCommit = git(pkgDir, ['rev-parse', '--verify', '--quiet', `refs/tags/${info.latest}^{commit}`], { allowFail: true });
-        const known = tagCommit.status === 0 ? tagCommit.stdout : (rtags[info.latest] && rtags[info.latest].commit);
-        info.latestCommit = known;
-        const isAnc = tagCommit.status === 0 && git(pkgDir, ['merge-base', '--is-ancestor', tagCommit.stdout, 'HEAD'], { allowFail: true }).status === 0;
+        const tagCommit = git(repoDir, ['rev-parse', '--verify', '--quiet', `refs/tags/${info.latest}^{commit}`], { allowFail: true });
+        info.latestCommit = tagCommit.status === 0 ? tagCommit.stdout : (rtags[info.latest] && rtags[info.latest].commit);
+        const isAnc = tagCommit.status === 0 && git(repoDir, ['merge-base', '--is-ancestor', tagCommit.stdout, 'HEAD'], { allowFail: true }).status === 0;
         if (!isAnc) {
             problems.push(`latest tag ${info.latest} is not an ancestor of HEAD${tagCommit.status === 0 ? '' : ' (and not present locally)'} -- tags are immutable; reconcile ${branch} with ${info.latest} first.`);
         }
     }
 
-    // Release tag decision.
-    if (info.latest && info.headTag === info.latest) {
-        info.releaseTag = info.latest;
-        info.newTag = false;
-    } else {
-        info.releaseTag = info.latest ? nextTag(info.latest) : 'V1';
-        info.newTag = true;
-    }
-
-    // Immutability: the release tag, if already on origin, must point at HEAD.
-    const onRemote = rtags[info.releaseTag];
-    info.releaseTagOnRemote = !!onRemote;
-    if (onRemote && onRemote.commit !== info.head) {
-        problems.push(`tag ${info.releaseTag} already exists on ${remote} and points at ${onRemote.commit.slice(0, 8)}, not HEAD (${info.head.slice(0, 8)}) -- published tags are immutable; refusing to move or reuse it.`);
-    }
-
     return { problems, info };
 }
 
-function runManifestVerify(pkgDir) {
-    const script = path.join(pkgDir, 'tools', 'build-asset-manifest.ps1');
+function runManifestVerify(pkgRoot) {
+    const script = path.join(pkgRoot, 'tools', 'build-asset-manifest.ps1');
     if (!fs.existsSync(script)) return { skipped: true, ok: true };
     const r = child_process.spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Verify'], { encoding: 'utf8' });
     if (r.error) return { ok: false, message: `could not launch powershell: ${r.error.message}` };
     return { ok: r.status === 0, message: ((r.stdout || '') + (r.stderr || '')).trim() };
 }
 
-function runPackageTests(pkgDir) {
-    const dir = path.join(pkgDir, 'tests');
+function runPackageTests(pkgRoot) {
+    const dir = path.join(pkgRoot, 'tests');
     if (!fs.existsSync(path.join(dir, 'package.json'))) return { skipped: true, ok: true };
     // A fixed command string (no args array): npm is npm.cmd on Windows so a shell is needed, and passing
     // an args array together with `shell: true` is deprecated in Node (DEP0190) because args are not escaped.
     const r = child_process.spawnSync('npm run test:local', { cwd: dir, shell: true, encoding: 'utf8', stdio: 'inherit' });
     return { ok: r.status === 0, message: `npm run test:local exited ${r.status}` };
-}
-
-// --- publish ----------------------------------------------------------------
-
-function publishPackage({ pkgDir, info, remote = 'origin', branch = 'main', log }) {
-    const tag = info.releaseTag;
-    if (info.newTag) {
-        const msg = buildTagMessage(pkgDir, tag, info.latest);
-        log(`  [git]  tag -a ${tag}\n`);
-        const t = git(pkgDir, ['tag', '-a', tag, '-m', msg], { allowFail: true });
-        if (t.status !== 0) throw new LinkedAbort(`git tag -a ${tag} failed: ${t.stderr || t.stdout}`);
-    }
-    if (info.ahead > 0) {
-        log(`  [git]  push ${remote} ${branch}  (${info.ahead} commit(s))\n`);
-        const p = git(pkgDir, ['push', remote, branch], { allowFail: true });
-        if (p.status !== 0) throw new LinkedAbort(`git push ${remote} ${branch} was rejected: ${p.stderr}\n        The tag ${tag} exists locally only; the next run resumes from it.`);
-    } else {
-        log(`  [git]  ${branch} already on ${remote}; nothing to push\n`);
-    }
-    if (!info.releaseTagOnRemote) {
-        log(`  [git]  push ${remote} ${tag}\n`);
-        const p = git(pkgDir, ['push', remote, `refs/tags/${tag}`], { allowFail: true });
-        if (p.status !== 0) throw new LinkedAbort(`git push ${remote} ${tag} was rejected: ${p.stderr}\n        The next run resumes from the local tag.`);
-    } else {
-        log(`  [git]  ${tag} already on ${remote} at HEAD; nothing to push\n`);
-    }
 }
 
 // --- CDN verification -------------------------------------------------------
@@ -454,20 +460,21 @@ async function verifyCdn({ checks, rewriteUrl = (u) => u, probe = httpProbe, con
 }
 
 /**
- * Work out everything the CDN must serve for these site texts at `tag`.
- *  - literal UiUx URLs (files): bytes from the local package tree (or manifest)
+ * Work out everything the CDN must serve for these site texts at `tag`. `pkgRoot` is the package folder
+ * (<repo>/<cdnSubpath>); every path is relative to it, exactly as jsDelivr serves it under the subpath.
+ *  - literal package URLs (files): bytes from the local package tree (cross-checked against the manifest)
  *  - literal URLs ending in '/' are BASE PREFIXES (the page builds file URLs from them at runtime): not fetched
  *  - every manifest file under each site's domain folder (`<slug>/...`) -- covers runtime-built URLs
- * Returns { checks, local: [string] (problems found without the network), prefixes: [...] }.
+ * Returns { checks, local: [string] (problems found without the network), prefixes, templates, usedManifest }.
  */
-function buildCdnChecks({ siteTexts, pkgDir, tag }) {
+function buildCdnChecks({ siteTexts, pkgRoot, spec, tag }) {
     const local = [];
     const prefixes = [];
     const templates = [];
-    const wanted = new Map(); // path -> { expectBytes, label }
+    const wanted = new Map(); // path -> { expectBytes, labels }
 
     let manifest = null;
-    const mpath = path.join(pkgDir, 'assets-manifest.json');
+    const mpath = path.join(pkgRoot, 'assets-manifest.json');
     if (fs.existsSync(mpath)) {
         try { manifest = JSON.parse(fs.readFileSync(mpath, 'utf8').replace(/^﻿/, '')); }
         catch (e) { local.push(`assets-manifest.json is not valid JSON: ${e.message}`); }
@@ -476,12 +483,12 @@ function buildCdnChecks({ siteTexts, pkgDir, tag }) {
 
     const add = (relPath, label) => {
         if (wanted.has(relPath)) { wanted.get(relPath).labels.add(label); return; }
-        const abs = path.join(pkgDir, relPath);
+        const abs = path.join(pkgRoot, relPath);
         const m = mfiles.get(relPath);
         let bytes;
         if (fs.existsSync(abs) && fs.statSync(abs).isFile()) bytes = fs.statSync(abs).size;
         if (bytes === undefined) {
-            local.push(`${label}: references '${relPath}', which is not in the package tree at HEAD`);
+            local.push(`${label}: references '${relPath}', which is not in the package tree (${spec.subpath || '.'}) at HEAD`);
             return;
         }
         if (m && m.bytes !== bytes) {
@@ -492,7 +499,7 @@ function buildCdnChecks({ siteTexts, pkgDir, tag }) {
     };
 
     for (const { slug, text } of siteTexts) {
-        for (const u of collectUiuxUrls(text)) {
+        for (const u of collectPackageUrls(text, spec)) {
             if (u.isTemplate) { templates.push({ site: slug, url: u.url }); continue; }
             if (u.tag !== tag) {
                 local.push(`${slug}: references ${u.url} -- pinned to '${u.tag}', expected release tag ${tag}`);
@@ -508,7 +515,7 @@ function buildCdnChecks({ siteTexts, pkgDir, tag }) {
     }
 
     const checks = [...wanted.entries()].map(([p, v]) => ({
-        url: cdnUrl(tag, p),
+        url: cdnUrl(spec, tag, p),
         expectBytes: v.expectBytes,
         label: [...v.labels].join(', '),
     }));
@@ -522,8 +529,8 @@ function buildCdnChecks({ siteTexts, pkgDir, tag }) {
  * (index.htm); override per site with `pinFiles`. Other uploaded files (e.g. a generated README.htm whose
  * body is documentation full of example URLs) are deployed but never pinned or scanned.
  */
-function siteHtmlFiles(site, repoRoot, expandFiles) {
-    const dir = path.resolve(repoRoot, site.sourceDir);
+function siteHtmlFiles(site, deployRoot, expandFiles) {
+    const dir = path.resolve(deployRoot, site.sourceDir);
     if (!fs.existsSync(dir)) return { dir, files: [] };
     const wanted = site.pinFiles || [site.stampFile || 'index.htm'];
     const uploaded = new Set(expandFiles(dir, site.files || ['index.htm']));
@@ -531,25 +538,35 @@ function siteHtmlFiles(site, repoRoot, expandFiles) {
     return { dir, files };
 }
 
+/** Repo-relative folder of a site ('mindattic.com'), or null when the site lives outside the repo. */
+function siteRelDir(repoDir, siteDir) {
+    const rel = path.relative(repoDir, siteDir).replace(/\\/g, '/');
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return null;
+    return rel;
+}
+
 // --- orchestration ----------------------------------------------------------
 
 class LinkedAbort extends Error {}
 
 /**
- * opts: { config, plan, dryRun, withTests, repoRoot }
- * deps: { log, expandFiles, deployOneSite(client, site, {skipHooks}), executeHooks(site, {tag}),
- *         createClient(), accessFtp(client, cfg), loadFtpSettings(), probe, rewriteUrl, retry,
- *         verifyManifest(pkgDir), runTests(pkgDir) }
+ * opts: { config, plan, dryRun, withTests, repoRoot }   (repoRoot = the MindAttic.Deploy folder; sourceDirs resolve from it)
+ * deps: { log, expandFiles, deployOneSite(client, site, {skipHooks, skipStamp}), executeHooks(site, {tag}),
+ *         stamp(absFile), createClient(), accessFtp(client, cfg), loadFtpSettings(), probe, rewriteUrl, retry,
+ *         verifyManifest(pkgRoot), runTests(pkgRoot) }
  */
 async function runLinked(opts, deps) {
     const { plan, dryRun, withTests, repoRoot } = opts;
     const log = deps.log || ((s) => process.stdout.write(s));
     const group = plan.group;
-    const pkgDir = path.resolve(repoRoot, group.package.sourceDir);
-    const branch = group.package.branch || 'main';
-    const remote = group.package.remote || 'origin';
+    const pkg = group.package;
+    const spec = cdnSpec(pkg);
+    const repoDir = path.resolve(repoRoot, pkg.sourceDir);
+    const pkgRoot = spec.subpath ? path.join(repoDir, spec.subpath) : repoDir;
+    const branch = pkg.branch || 'main';
+    const remote = pkg.remote || 'origin';
     const wouldAbort = [];     // dry-run: gates that would stop a real run
-    const result = { ok: true, aborted: false, tag: null, sites: [], wouldAbort };
+    const result = { ok: true, aborted: false, tag: null, reused: false, commit: null, sites: [], wouldAbort };
 
     const gateFail = (msg) => {
         if (dryRun) { wouldAbort.push(msg); log(`  [WOULD ABORT] ${msg}\n`); }
@@ -557,121 +574,200 @@ async function runLinked(opts, deps) {
     };
 
     try {
-        log(`\nLinked deploy: group '${plan.groupName}'${dryRun ? '  [DRY-RUN -- nothing is tagged, pushed, written or uploaded]' : ''}\n`);
-        log(`  package : ${group.package.slug} (${pkgDir})\n`);
+        log(`\nLinked deploy: group '${plan.groupName}'${dryRun ? '  [DRY-RUN -- nothing is written, committed, tagged, pushed or uploaded]' : ''}\n`);
+        log(`  package : ${pkg.slug} (${pkgRoot})  ->  ${cdnBase(spec, '<tag>')}\n`);
+        log(`  repo    : ${pkg.repo} (${repoDir})\n`);
         log(`  sites   : ${plan.sites.map((s) => s.slug).join(' -> ')}   (FTP order)\n`);
         for (const w of plan.warnings || []) log(`  [warn] ${w}\n`);
 
         // 1. preflight ------------------------------------------------------
-        log(`\n[1/6] preflight\n`);
-        const { problems, info } = inspectPackage({ pkgDir, branch, remote, fetch: !dryRun });
+        log(`\n[1/8] preflight\n`);
+        const { problems, info } = inspectRepo({ repoDir, branch, remote, fetch: !dryRun, firstTag: pkg.firstTag });
         for (const p of problems) gateFail(p);
-        if (!info.head) throw new LinkedAbort('cannot continue without a package git repo.');
+        if (!info.head || !info.remoteReachable) throw new LinkedAbort('cannot continue without the package git repo and its remote.');
 
-        const mv = (deps.verifyManifest || runManifestVerify)(pkgDir);
-        if (mv.skipped) log(`  [ok]   (no tools/build-asset-manifest.ps1 in the package -- manifest gate skipped)\n`);
+        const mv = (deps.verifyManifest || runManifestVerify)(pkgRoot);
+        if (mv.skipped) log(`  [ok]   (no tools/build-asset-manifest.ps1 in ${spec.subpath || 'the package'} -- manifest gate skipped)\n`);
         else if (mv.ok) log(`  [ok]   assets-manifest.json is current\n`);
-        else gateFail(`assets-manifest.json is stale or invalid -- run tools\\build-asset-manifest.ps1 and commit it.\n    ${mv.message || ''}`);
+        else gateFail(`assets-manifest.json is stale or invalid -- run ${spec.subpath ? spec.subpath + '\\' : ''}tools\\build-asset-manifest.ps1 and commit it.\n    ${mv.message || ''}`);
 
         if (withTests) {
-            const t = (deps.runTests || runPackageTests)(pkgDir);
-            if (t.skipped) log(`  [warn] --with-tests: no tests/ package found in ${group.package.slug}; skipped\n`);
+            const t = (deps.runTests || runPackageTests)(pkgRoot);
+            if (t.skipped) log(`  [warn] --with-tests: no tests/ package found in ${pkg.slug}; skipped\n`);
             else if (t.ok) log(`  [ok]   package tests passed\n`);
             else gateFail(`package tests failed (${t.message})`);
         }
 
+        const siteDirs = [];
         for (const site of plan.sites) {
             const { dir, files } = siteHtmlFiles(site, repoRoot, deps.expandFiles);
-            if (!fs.existsSync(dir)) gateFail(`site '${site.slug}': sourceDir not found: ${dir}`);
-            else if (files.length === 0) gateFail(`site '${site.slug}': no .htm/.html files matched ${JSON.stringify(site.files)} in ${dir}`);
+            if (!fs.existsSync(dir)) { gateFail(`site '${site.slug}': sourceDir not found: ${dir}`); continue; }
+            if (files.length === 0) gateFail(`site '${site.slug}': no .htm/.html files matched ${JSON.stringify(site.files)} in ${dir}`);
+            const rel = siteRelDir(repoDir, dir);
+            if (rel === null) gateFail(`site '${site.slug}': ${dir} is not inside the package repo ${repoDir} -- a linked site must live in the same repo.`);
+            else siteDirs.push(rel);
         }
 
         let ftpOk = true;
         try { deps.loadFtpSettings(); } catch (e) { ftpOk = false; if (dryRun) log(`  [warn] FTP secrets not resolvable (${e.message}) -- not needed for a dry-run\n`); else gateFail(`FTP secrets: ${e.message}`); }
         if (ftpOk) log(`  [ok]   FTP secrets resolvable\n`);
 
-        log(`  [ok]   package: HEAD ${info.head.slice(0, 8)} on ${info.currentBranch}, latest tag ${info.latest || '(none)'}, ${info.ahead} commit(s) ahead of ${remote}/${branch}\n`);
+        log(`  [ok]   repo: HEAD ${info.head.slice(0, 8)} on ${info.currentBranch}, latest tag ${info.latest || '(none)'}${info.headTag ? ` (HEAD is ${info.headTag})` : ''}, ${info.ahead} commit(s) ahead of ${remote}/${branch}\n`);
 
-        // Read the sites now (still before anything is tagged/pushed/written) so every
-        // "this can never work" condition aborts BEFORE the package is published.
-        const tag0 = info.releaseTag;
-        const siteState = [];   // { site, dir, files: [{file, abs, text, rewritten, changes}] }
-        for (const site of plan.sites) {
+        // Read the site pages now (before anything is written) so every "this can never work" condition
+        // aborts BEFORE anything is committed or published.
+        const readSites = () => plan.sites.map((site) => {
             const { dir, files } = siteHtmlFiles(site, repoRoot, deps.expandFiles);
-            const st = { site, dir, files: [] };
-            for (const f of files) {
+            return { site, dir, files: files.map((f) => {
                 const abs = path.join(dir, f);
-                const text = fs.readFileSync(abs, 'utf8');
-                const rw = rewritePins(text, tag0);
-                st.files.push({ file: f, abs, text, rewritten: rw.text, changes: rw.changes });
-            }
-            siteState.push(st);
+                return { file: f, abs, text: fs.readFileSync(abs, 'utf8') };
+            }) };
+        });
+        const siteState = readSites();
+
+        // 2. release tag ----------------------------------------------------
+        const pinsMatch = (tag) => siteState.every((st) => st.files.every((f) => rewritePins(f.text, tag, spec).changes.length === 0));
+        const reuse = !!(info.latest && info.headTag === info.latest && pinsMatch(info.latest));
+        const tag = reuse ? info.latest : info.nextTag;
+        result.tag = tag;
+        result.reused = reuse;
+        const tagOnRemote = info.remoteTags[tag];
+        if (reuse && tagOnRemote && tagOnRemote.commit !== info.head) {
+            gateFail(`tag ${tag} already exists on ${remote} and points at ${tagOnRemote.commit.slice(0, 8)}, not HEAD (${info.head.slice(0, 8)}) -- published tags are immutable; refusing to move or reuse it.`);
+        } else if (!reuse && tagOnRemote) {
+            gateFail(`tag ${tag} already exists on ${remote} (${tagOnRemote.commit.slice(0, 8)}) -- published tags are immutable; refusing to reuse it.`);
+        }
+        log(`\n[2/8] release tag  ->  ${tag}${reuse ? '  (REUSED: HEAD already carries it and every page is pinned to it)' : `  (NEW${info.latest ? `, after ${info.latest}` : `, first tag ${pkg.firstTag || 'V1'}`})`}\n`);
+
+        for (const st of siteState) for (const f of st.files) {
+            const rw = rewritePins(f.text, tag, spec);
+            f.rewritten = rw.text;
+            f.changes = rw.changes;
         }
         // A pin NEWER than the release tag means the page references package work that was never tagged.
         for (const st of siteState) for (const f of st.files) {
-            const newer = f.changes.filter((c) => parseTag(c.from) > parseTag(tag0));
-            if (newer.length) gateFail(`${st.site.slug}/${f.file} pins ${[...new Set(newer.map((c) => c.from))].join(', ')} but the release tag would be ${tag0} -- the page references a package version that has not been tagged (commit + tag the package first).`);
+            const newer = f.changes.filter((c) => parseTag(c.from) > parseTag(tag));
+            if (newer.length) gateFail(`${st.site.slug}/${f.file} pins ${[...new Set(newer.map((c) => c.from))].join(', ')} but the release tag would be ${tag} -- the page references a package version that has not been tagged.`);
         }
         // Local-only asset checks (path exists in the package tree, manifest not stale, one tag everywhere).
-        const early = buildCdnChecks({ siteTexts: siteState.flatMap((st) => st.files.map((f) => ({ slug: st.site.slug, text: f.rewritten }))), pkgDir, tag: tag0 });
+        const early = buildCdnChecks({ siteTexts: siteState.flatMap((st) => st.files.map((f) => ({ slug: st.site.slug, text: f.rewritten }))), pkgRoot, spec, tag });
         for (const p of early.local) gateFail(p);
 
-        // 2. publish --------------------------------------------------------
-        const tag = info.releaseTag;
-        result.tag = tag;
-        log(`\n[2/6] publish package  ->  ${tag}${info.newTag ? '  (NEW tag)' : '  (existing tag at HEAD)'}\n`);
-        if (dryRun) {
-            if (info.newTag) log(`  [git]  (dry-run) would tag -a ${tag} and push ${remote} ${branch} + ${tag}\n`);
-            else log(`  [git]  (dry-run) ${tag} already at HEAD${info.releaseTagOnRemote ? ' and on origin' : ' (NOT yet on origin -- would push it)'}${info.ahead ? `; would push ${info.ahead} commit(s) to ${remote}/${branch}` : ''}\n`);
+        // 3-5. prepare, commit, tag -----------------------------------------
+        if (reuse) {
+            log(`\n[3/8] prepare sites  -- skipped: the tagged commit already holds the pinned, spliced and stamped pages\n`);
+            log(`[4/8] commit         -- skipped (reused tag)\n`);
+            log(`[5/8] tag            -- skipped (${tag} already at HEAD)\n`);
         } else {
-            publishPackage({ pkgDir, info, remote, branch, log });
-        }
-
-        // 3. pin ------------------------------------------------------------
-        log(`\n[3/6] pin ${tag} in the sites\n`);
-        for (const st of siteState) for (const f of st.files) {
-            if (f.changes.length === 0) { log(`  [ok]   ${st.site.slug}/${f.file}: already pinned to ${tag}\n`); continue; }
-            const froms = [...new Set(f.changes.map((c) => c.from))].join(', ');
-            log(`  [pin]  ${st.site.slug}/${f.file}: ${froms} -> ${tag}  (${f.changes.length} pin(s), line(s) ${f.changes.slice(0, 8).map((c) => c.line).join(', ')}${f.changes.length > 8 ? ', ...' : ''})${dryRun ? '  [dry-run: not written]' : ''}\n`);
-            if (!dryRun) fs.writeFileSync(f.abs, f.rewritten, 'utf8');
-        }
-
-        // 4. prepare (hooks) ------------------------------------------------
-        log(`\n[4/6] prepare sites (preDeploy hooks)\n`);
-        for (const site of plan.sites) {
-            const hooks = site.preDeploy || [];
-            if (hooks.length === 0) { log(`  [ok]   ${site.slug}: no hooks\n`); continue; }
+            log(`\n[3/8] prepare sites  (pin ${tag}, preDeploy hooks, stamp)\n`);
+            for (const st of siteState) for (const f of st.files) {
+                if (f.changes.length === 0) { log(`  [ok]   ${st.site.slug}/${f.file}: already pinned to ${tag}\n`); continue; }
+                const froms = [...new Set(f.changes.map((c) => c.from))].join(', ');
+                log(`  [pin]  ${st.site.slug}/${f.file}: ${froms} -> ${tag}  (${f.changes.length} pin(s), line(s) ${f.changes.slice(0, 8).map((c) => c.line).join(', ')}${f.changes.length > 8 ? ', ...' : ''})${dryRun ? '  [dry-run: not written]' : ''}\n`);
+            }
             if (dryRun) {
-                for (const h of hooks) log(`  [hook] (dry-run) skipped ${h.kind}${h.file ? ' ' + h.file : ''}${h.required === false ? ' (optional)' : ''} -- hooks mutate files; they run for real only in a non-dry run\n`);
+                for (const site of plan.sites) {
+                    for (const h of site.preDeploy || []) log(`  [hook] (dry-run) ${site.slug}: would run ${h.kind}${h.file ? ' ' + h.file : ''}${h.tagArg ? ` ${h.tagArg} ${tag}` : ''}${h.required === false ? ' (optional)' : ''}\n`);
+                    if (site.stampFile) log(`  [stamp] (dry-run) ${site.slug}: would stamp ${site.stampFile}\n`);
+                }
+                log(`\n[4/8] commit  (dry-run) would commit the site changes: "Pin ${pkg.slug} ${tag}"\n`);
+                log(`[5/8] tag     (dry-run) would tag -a ${tag} on that commit\n`);
             } else {
-                log(`  ${site.slug}:\n`);
-                await deps.executeHooks(site, { tag, skipUiuxPull: true });
+                // From here until the commit, any failure restores the tree preflight found clean.
+                try {
+                    for (const st of siteState) for (const f of st.files) if (f.changes.length) fs.writeFileSync(f.abs, f.rewritten, 'utf8');
+                    for (const site of plan.sites) {
+                        if ((site.preDeploy || []).length === 0) { log(`  [ok]   ${site.slug}: no hooks\n`); continue; }
+                        log(`  ${site.slug}:\n`);
+                        await deps.executeHooks(site, { tag, skipPackagePull: true });
+                    }
+                    for (const site of plan.sites) {
+                        if (!site.stampFile) continue;
+                        const abs = path.join(path.resolve(repoRoot, site.sourceDir), site.stampFile);
+                        if (!fs.existsSync(abs)) { log(`  [stamp] ${site.slug}: skipped (${site.stampFile} not found)\n`); continue; }
+                        if (!deps.stamp) { log(`  [stamp] ${site.slug}: skipped (no stamp function wired)\n`); continue; }
+                        const when = deps.stamp(abs);
+                        log(`  [stamp] ${site.slug}/${site.stampFile} <- ${when}\n`);
+                    }
+                    const changed = porcelainPaths(repoDir);
+                    const outside = changed.filter((p) => !siteDirs.some((d) => p === d || p.startsWith(d + '/')));
+                    if (outside.length) {
+                        throw new LinkedAbort(`a preDeploy hook changed ${outside.length} file(s) outside the group's site folders (${siteDirs.join(', ')}); refusing to commit them:\n    ${outside.slice(0, 15).join('\n    ')}`);
+                    }
+
+                    log(`\n[4/8] commit\n`);
+                    if (changed.length === 0) {
+                        log(`  [git]  nothing changed; tagging HEAD as is\n`);
+                    } else {
+                        git(repoDir, ['add', '-A', '--', ...siteDirs]);
+                        const msg = `Pin ${pkg.slug} ${tag}`;
+                        const c = git(repoDir, ['commit', '-m', msg], { allowFail: true });
+                        if (c.status !== 0) throw new LinkedAbort(`git commit failed: ${c.stderr || c.stdout}`);
+                        log(`  [git]  commit "${msg}"  (${changed.length} file(s))\n`);
+                    }
+                } catch (e) {
+                    log(`  [git]  restoring the working tree (reset --hard HEAD, clean -fd)\n`);
+                    git(repoDir, ['reset', '--hard', 'HEAD'], { allowFail: true });
+                    git(repoDir, ['clean', '-fd'], { allowFail: true });
+                    throw e;
+                }
+                result.commit = git(repoDir, ['rev-parse', 'HEAD']).stdout;
+
+                log(`\n[5/8] tag\n`);
+                const tmsg = buildTagMessage(repoDir, tag, info.latest);
+                const t = git(repoDir, ['tag', '-a', tag, '-m', tmsg], { allowFail: true });
+                if (t.status !== 0) throw new LinkedAbort(`git tag -a ${tag} failed: ${t.stderr || t.stdout}\n        The pin commit ${result.commit.slice(0, 8)} is local only.`);
+                log(`  [git]  tag -a ${tag} -> ${result.commit.slice(0, 8)}\n`);
             }
         }
 
-        // 5. CDN gate -------------------------------------------------------
-        log(`\n[5/6] CDN gate  (every asset the sites use must be live on jsDelivr at ${tag}, byte-exact)\n`);
+        // 6. push -----------------------------------------------------------
+        log(`\n[6/8] push\n`);
+        const head = dryRun ? info.head : git(repoDir, ['rev-parse', 'HEAD']).stdout;
+        const mainNeedsPush = !dryRun ? head !== info.remoteMain : (!reuse || info.ahead > 0);
+        const tagNeedsPush = !tagOnRemote;
+        if (dryRun) {
+            log(`  [git]  (dry-run) ${mainNeedsPush ? `would push ${remote} ${branch}` : `${branch} already on ${remote}`}; ${tagNeedsPush ? `would push ${remote} ${tag}` : `${tag} already on ${remote}`}\n`);
+        } else {
+            if (mainNeedsPush) {
+                log(`  [git]  push ${remote} ${branch}\n`);
+                const p = git(repoDir, ['push', remote, branch], { allowFail: true });
+                if (p.status !== 0) throw new LinkedAbort(`git push ${remote} ${branch} was rejected: ${p.stderr}\n        The commit and tag ${tag} exist locally only; the next run reuses them and pushes again.`);
+            } else {
+                log(`  [git]  ${branch} already on ${remote}; nothing to push\n`);
+            }
+            if (tagNeedsPush) {
+                log(`  [git]  push ${remote} ${tag}\n`);
+                const p = git(repoDir, ['push', remote, `refs/tags/${tag}`], { allowFail: true });
+                if (p.status !== 0) throw new LinkedAbort(`git push ${remote} ${tag} was rejected: ${p.stderr}\n        The next run reuses the local tag and pushes again.`);
+            } else {
+                log(`  [git]  ${tag} already on ${remote} at HEAD; nothing to push\n`);
+            }
+        }
+
+        // 7. CDN gate -------------------------------------------------------
+        log(`\n[7/8] CDN gate  (every asset the sites use must be live on jsDelivr at ${tag}, byte-exact)\n`);
         const siteTexts = [];
         for (const st of siteState) {
             for (const f of st.files) {
-                // After hooks (real run) the file on disk is the truth; in a dry-run use the would-be text.
+                // After hooks (real run) the committed file is the truth; in a dry-run use the would-be text.
                 const text = dryRun ? f.rewritten : fs.readFileSync(f.abs, 'utf8');
                 siteTexts.push({ slug: st.site.slug, text });
             }
         }
-        const plan5 = buildCdnChecks({ siteTexts, pkgDir, tag });
-        for (const p of plan5.local) gateFail(p);
-        for (const p of plan5.templates || []) log(`  [info] ${p.site}: ignoring template/example URL ${p.url}\n`);
-        for (const p of plan5.prefixes) log(`  [info] ${p.site}: base prefix ${p.url} (files under it are built at runtime; covered by the manifest)\n`);
-        if (!plan5.usedManifest) log(`  [warn] no assets-manifest.json in the package -- only literal URLs can be verified\n`);
-        log(`  [cdn]  ${plan5.checks.length} URL(s) to verify\n`);
+        const gate = buildCdnChecks({ siteTexts, pkgRoot, spec, tag });
+        for (const p of gate.local) gateFail(p);
+        for (const p of gate.templates) log(`  [info] ${p.site}: ignoring template/example URL ${p.url}\n`);
+        for (const p of gate.prefixes) log(`  [info] ${p.site}: base prefix ${p.url} (files under it are built at runtime; covered by the manifest)\n`);
+        if (!gate.usedManifest) log(`  [warn] no assets-manifest.json in the package -- only literal URLs can be verified\n`);
+        log(`  [cdn]  ${gate.checks.length} URL(s) to verify\n`);
 
-        const tagPublished = !dryRun || (!info.newTag && info.releaseTagOnRemote);
+        const tagPublished = !dryRun || !!tagOnRemote;
         if (!tagPublished) {
             log(`  [cdn]  (dry-run) ${tag} is not published yet -- the live CDN check would run after the push\n`);
-        } else if (plan5.checks.length) {
+        } else if (gate.checks.length) {
             const v = await verifyCdn({
-                checks: plan5.checks, rewriteUrl: deps.rewriteUrl, probe: deps.probe || httpProbe,
+                checks: gate.checks, rewriteUrl: deps.rewriteUrl, probe: deps.probe || httpProbe,
                 retry: dryRun ? { totalMs: 0 } : deps.retry,   // a dry-run never waits for a CDN to catch up
                 log, concurrency: 6,
             });
@@ -682,14 +778,14 @@ async function runLinked(opts, deps) {
                     const shown = list.slice(0, 6).map((f) => `      ${f.url}  [${f.label}]`).join('\n');
                     return `    ${list.length} x ${reason}\n${shown}${list.length > 6 ? `\n      ...and ${list.length - 6} more` : ''}`;
                 }).join('\n');
-                gateFail(`${v.failures.length} of ${plan5.checks.length} CDN URL(s) failed verification at ${tag}:\n${lines}`);
+                gateFail(`${v.failures.length} of ${gate.checks.length} CDN URL(s) failed verification at ${tag}:\n${lines}`);
             } else {
-                log(`  [ok]   all ${plan5.checks.length} URL(s) live at ${tag} with matching bytes\n`);
+                log(`  [ok]   all ${gate.checks.length} URL(s) live at ${tag} with matching bytes\n`);
             }
         }
 
-        // 6. FTP ------------------------------------------------------------
-        log(`\n[6/6] FTP deploy${dryRun ? '  [DRY-RUN]' : ''}\n`);
+        // 8. FTP ------------------------------------------------------------
+        log(`\n[8/8] FTP deploy${dryRun ? '  [DRY-RUN]' : ''}\n`);
         if (dryRun && wouldAbort.length) {
             log(`  (dry-run) ${wouldAbort.length} gate(s) above WOULD abort a real run before any upload. Showing the upload plan anyway:\n`);
         }
@@ -710,7 +806,8 @@ async function runLinked(opts, deps) {
             for (const site of plan.sites) {
                 try {
                     await ensureConnected();
-                    const r = await deps.deployOneSite(client, site, { skipHooks: true });
+                    // Hooks ran and the stamp was committed in step 3; the upload sends the committed page as is.
+                    const r = await deps.deployOneSite(client, site, { skipHooks: true, skipStamp: true });
                     result.sites.push({ slug: site.slug, uploaded: r.uploaded, failed: r.failed, error: null });
                 } catch (e) {
                     log(`\n  [SITE FAIL] ${site.slug}: ${e.message}\n`);
@@ -733,27 +830,29 @@ async function runLinked(opts, deps) {
         }
 
         // Summary table --------------------------------------------------------
-        log(`\nLinked deploy summary  (package ${group.package.slug} @ ${tag})\n`);
+        log(`\nLinked deploy summary  (${pkg.slug} @ ${tag}${reuse ? ', reused' : ''})\n`);
         for (const s of result.sites) {
             const status = dryRun ? 'dry-run' : (s.error || s.failed ? 'FAILED' : 'ok');
             log(`  ${s.slug.padEnd(22)} ${String(s.uploaded).padStart(3)} uploaded  ${String(s.failed).padStart(2)} failed  ${status}${s.error ? '  (' + s.error + ')' : ''}\n`);
         }
         if (!dryRun) {
-            for (const st of siteState) {
-                const sd = st.dir;
-                const dirty = git(sd, ['status', '--porcelain'], { allowFail: true });
-                const unpushed = git(sd, ['rev-list', '--count', '@{u}..HEAD'], { allowFail: true });
+            const dirty = porcelainPaths(repoDir);
+            const rm = git(repoDir, ['ls-remote', remote, `refs/heads/${branch}`], { allowFail: true });
+            const remoteMain = rm.status === 0 && rm.stdout ? rm.stdout.split(/\s+/)[0] : null;
+            const localHead = git(repoDir, ['rev-parse', 'HEAD']).stdout;
+            if (dirty.length === 0 && remoteMain === localHead) log(`  [ok]   ${pkg.repo}: working tree clean, ${branch} in sync with ${remote} at ${localHead.slice(0, 8)} (${tag})\n`);
+            else {
                 const notes = [];
-                if (dirty.status === 0 && dirty.stdout) notes.push(`${dirty.stdout.split('\n').length} uncommitted change(s)`);
-                if (unpushed.status === 0 && parseInt(unpushed.stdout, 10) > 0) notes.push(`${unpushed.stdout} unpushed commit(s)`);
-                if (notes.length) log(`  [note] ${st.site.slug}: ${notes.join(', ')} -- deploy does not commit or push site repos\n`);
+                if (dirty.length) notes.push(`${dirty.length} uncommitted change(s)`);
+                if (remoteMain !== localHead) notes.push(`${branch} differs from ${remote}/${branch}`);
+                log(`  [note] ${pkg.repo}: ${notes.join(', ')} after the deploy\n`);
             }
         }
         const bad = result.sites.filter((s) => s.error || s.failed);
         result.ok = dryRun ? true : bad.length === 0;
         if (dryRun && wouldAbort.length) log(`\nDry-run complete: ${wouldAbort.length} gate(s) WOULD ABORT a real run (see [WOULD ABORT] lines).\n`);
         else if (dryRun) log(`\nDry-run complete: a real run would pass every gate and upload ${plan.sites.length} site(s).\n`);
-        else log(bad.length ? `\nDone with ${bad.length} failed site(s).\n` : `\nDone. All ${result.sites.length} site(s) deployed against ${group.package.slug}@${tag}.\n`);
+        else log(bad.length ? `\nDone with ${bad.length} failed site(s).\n` : `\nDone. All ${result.sites.length} site(s) deployed against ${pkg.slug}@${tag}.\n`);
     } catch (e) {
         if (!(e instanceof LinkedAbort)) throw e;
         result.ok = false;
@@ -764,10 +863,10 @@ async function runLinked(opts, deps) {
 }
 
 module.exports = {
-    parseTag, sortTags, latestTag, nextTag,
+    parseTag, sortTags, latestTag, nextTag, releaseTagAfter,
     planTargets, findGroupOfSite,
-    rewritePins, collectUiuxUrls, cdnUrl,
-    inspectPackage, publishPackage, remoteTags, buildTagMessage,
+    cdnSpec, cdnBase, rewritePins, collectPackageUrls, cdnUrl,
+    inspectRepo, remoteTags, buildTagMessage,
     httpProbe, verifyCdn, buildCdnChecks,
     runManifestVerify, runPackageTests,
     runLinked, LinkedAbort,

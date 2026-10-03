@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 /*
  * deploy.js -- two pipelines under one roof: root sites (including the linked
- * MindAttic.UiUx group, see linked.js) and apps. A run without a mode flag
+ * MindAttic.Web group, see linked.js) and apps. A run without a mode flag
  * prints usage and exits 2.
  *
  *   Root sites (--site / --sites):
  *     For each site in projects.json.sites, run preDeploy hooks,
  *     stamp index.htm with a Last Updated timestamp, then FTPS-upload
- *     the configured files glob to the site's ftpRemotePath.
+ *     the configured files glob to the site's ftpRemotePath. Members of the
+ *     linked group go through src/linked.js instead (pin, commit, tag, push,
+ *     CDN gate, then FTP).
  *
  *   Apps (--app / --apps):
  *     For each app in projects.json.apps (Blazor / GitHub-Actions-driven),
- *     run preDeploy hooks (uiux-pull, powershell, dotnet-build), stage
+ *     run preDeploy hooks (package-pull, powershell, dotnet-build), stage
  *     any `stageOnly` paths, commit (if staged changes), and push the
  *     configured branch. The push triggers the project's existing
  *     .github/workflows/<workflow>.yml. Disabled apps print their note
@@ -21,9 +23,9 @@
  *   --site <slug>          : site mode    -- deploy a root site. A member of a linked group
  *                            (projects.json linkedGroups) deploys the WHOLE group -- see src/linked.js
  *   --sites                : site mode    -- deploy every root site (the linked group goes through the linked flow)
- *   --uiux | --package     : linked mode  -- publish the MindAttic.UiUx package and deploy the whole linked group
+ *   --uiux | --package     : linked mode  -- publish MindAttic.Web.Shared (the MindAttic.Web package) and deploy the whole linked group
  *   --no-link              : site mode    -- escape hatch: deploy ONLY the named site, skipping the linked flow
- *   --with-tests           : linked mode  -- also run MindAttic.UiUx/tests (npm run test:local) as a gate
+ *   --with-tests           : linked mode  -- also run MindAttic.Web.Shared/tests (npm run test:local) as a gate
  *   --app <slug>           : app mode     -- deploy a single Blazor app (via GitHub Actions)
  *   --apps                 : app mode     -- deploy every ENABLED app (use --include-disabled to surface stubs)
  *   --include-disabled     : app mode     -- include `disabled: true` apps in --apps iteration
@@ -59,11 +61,11 @@ A mode flag is required: --site, --sites, --uiux, --app or --apps.
 
 Flags (also accept --flag=value form):
   --site <slug>        site mode:    deploy a root site (a linked-group member deploys the WHOLE group:
-                       package tag + push, pin, CDN gate, then FTP for every site in the group)
+                       pin + commit + tag + push MindAttic.Web, CDN gate, then FTP for every site in the group)
   --sites              site mode:    deploy every root site (linked group first, via the linked flow)
-  --uiux | --package   linked mode:  publish MindAttic.UiUx and deploy the whole linked group
+  --uiux | --package   linked mode:  publish MindAttic.Web.Shared and deploy the whole linked group
   --no-link            site mode:    ESCAPE HATCH -- deploy only the named site (loud warning)
-  --with-tests         linked mode:  also run MindAttic.UiUx/tests as a gate before publishing
+  --with-tests         linked mode:  also run MindAttic.Web.Shared/tests as a gate before publishing
   --app <slug>         app mode:     deploy a single Blazor app via GitHub Actions
   --apps               app mode:     deploy every enabled app
   --include-disabled   app mode:     include disabled apps in --apps iteration
@@ -231,15 +233,21 @@ function stampIndex(absFile) {
     return date;
 }
 
-function runUiuxPull() {
-    const uiuxRoot = path.resolve(repoRoot, '..', 'MindAttic.UiUx');
-    if (!fs.existsSync(path.join(uiuxRoot, '.git'))) {
-        throw new Error(`MindAttic.UiUx is not a git repo at ${uiuxRoot}. Clone https://github.com/mindattic/MindAttic.UiUx.git into that folder before re-running deploy.`);
+// The shared package repo comes from projects.json (the first linkedGroups entry with a `package`),
+// never from a hard-coded folder name.
+let loadedConfig = null;
+
+function runPackagePull() {
+    const g = Object.values((loadedConfig && loadedConfig.linkedGroups) || {}).find((x) => x.package);
+    if (!g) throw new Error('package-pull hook: projects.json has no linkedGroups entry with a `package`.');
+    const pkgRepo = path.resolve(repoRoot, g.package.sourceDir);
+    if (!fs.existsSync(path.join(pkgRepo, '.git'))) {
+        throw new Error(`${g.package.repo} is not a git repo at ${pkgRepo}. Clone https://github.com/${g.package.repo}.git into that folder before re-running deploy.`);
     }
-    process.stdout.write(`  [hook] git -C ${uiuxRoot} pull --no-edit --no-rebase\n`);
-    const r = child_process.spawnSync('git', ['-C', uiuxRoot, 'pull', '--no-edit', '--no-rebase'], { stdio: 'inherit' });
+    process.stdout.write(`  [hook] git -C ${pkgRepo} pull --no-edit --no-rebase\n`);
+    const r = child_process.spawnSync('git', ['-C', pkgRepo, 'pull', '--no-edit', '--no-rebase'], { stdio: 'inherit' });
     if (r.status !== 0) {
-        throw new Error(`git pull on MindAttic.UiUx failed (exit ${r.status}). Resolve the conflict / uncommitted changes and re-run.`);
+        throw new Error(`git pull on ${g.package.repo} failed (exit ${r.status}). Resolve the conflict / uncommitted changes and re-run.`);
     }
 }
 
@@ -275,20 +283,20 @@ function runDotnetBuildHook(project, configuration) {
     return r.status;
 }
 
-// opts (linked deploy only): { tag, skipUiuxPull }.
-//   - skipUiuxPull: the linked flow already verified the package repo (clean, not behind origin) and
-//     published it, so the `git pull` hook is redundant there.
+// opts (linked deploy only): { tag, skipPackagePull }.
+//   - skipPackagePull: the linked flow already verified the repo (clean, on main, not behind origin), so
+//     the `git pull` hook is redundant there.
 //   - tag: appended to a powershell hook that declares `tagArg` (e.g. "-CyberspaceCdnTag") so the sync
-//     script splices the SAME package tag the linked flow just published and pinned.
+//     script splices the SAME package tag the linked flow pins and publishes.
 async function executePreDeploy(profile, opts = {}) {
     for (const hook of profile.preDeploy || []) {
         const required = hook.required !== false;
         try {
-            if (hook.kind === 'uiux-pull') {
-                if (opts.skipUiuxPull) {
-                    process.stdout.write(`  [hook] uiux-pull skipped (linked deploy already verified + published MindAttic.UiUx)\n`);
+            if (hook.kind === 'package-pull') {
+                if (opts.skipPackagePull) {
+                    process.stdout.write(`  [hook] package-pull skipped (the linked deploy already verified the repo)\n`);
                 } else {
-                    runUiuxPull();
+                    runPackagePull();
                 }
             } else if (hook.kind === 'powershell') {
                 const hookArgs = [...(hook.args || [])];
@@ -359,7 +367,9 @@ async function deployOneSite(client, site, opts = {}) {
         return { uploaded: 0, failed: 0 };
     }
 
-    if (site.stampFile) {
+    if (site.stampFile && opts.skipStamp) {
+        process.stdout.write(`  [stamp] (skipped: the linked deploy stamped and committed ${site.stampFile})\n`);
+    } else if (site.stampFile) {
         const stampPath = path.join(sourceDir, site.stampFile);
         if (fs.existsSync(stampPath)) {
             const date = stampIndex(stampPath);
@@ -415,7 +425,7 @@ async function deployOneApp(app) {
     }
 
     if (dryRun && (app.preDeploy || []).length > 0) {
-        process.stdout.write(`  [dry-run] note: preDeploy hooks still RUN (uiux-pull / dotnet build / sync scripts may mutate state or upload assets); only the git commit + push are skipped.\n`);
+        process.stdout.write(`  [dry-run] note: preDeploy hooks still RUN (package-pull / dotnet build / sync scripts may mutate state or upload assets); only the git commit + push are skipped.\n`);
     }
     await executePreDeploy(app);
 
@@ -547,7 +557,7 @@ async function runSiteMode(config, targetsOverride) {
     if (totalFailed > 0 || siteErrors.length > 0) process.exit(1);
 }
 
-// Linked group (MindAttic.UiUx + ryandebraal.com + mindatticcares.com + mindattic.com): see src/linked.js.
+// Linked group (MindAttic.Web: MindAttic.Web.Shared + ryandebraal.com + mindatticcares.com + Hyperspace + mindattic.com): see src/linked.js.
 async function runLinkedMode(config, plan) {
     const linked = require('./linked');
     const result = await linked.runLinked(
@@ -557,6 +567,7 @@ async function runLinkedMode(config, plan) {
             expandFiles,
             deployOneSite,
             executeHooks: (site, opts) => executePreDeploy(site, opts),
+            stamp: stampIndex,
             createClient: () => { const c = new ftp.Client(60_000); c.ftp.verbose = false; return c; },
             accessFtp,
             loadFtpSettings,
@@ -567,6 +578,7 @@ async function runLinkedMode(config, plan) {
 
 async function main() {
     const config = JSON.parse(await fsp.readFile(projectsPath, 'utf8'));
+    loadedConfig = config;
     if (appSlug || allApps) {
         await runAppMode(config);
     } else {

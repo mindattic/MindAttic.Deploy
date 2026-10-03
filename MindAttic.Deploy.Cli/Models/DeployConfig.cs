@@ -23,7 +23,7 @@ public sealed class AppProfile
     [JsonPropertyName("preDeploy")]     public List<HookProfile> PreDeploy    { get; set; } = new();
 }
 
-/// <summary>A single preDeploy hook entry (uiux-pull / powershell / dotnet-build).</summary>
+/// <summary>A single preDeploy hook entry (package-pull / powershell / dotnet-build).</summary>
 public sealed class HookProfile
 {
     [JsonPropertyName("kind")]          public string  Kind          { get; set; } = "";
@@ -37,7 +37,7 @@ public sealed class HookProfile
 }
 
 /// <summary>
-/// A permanently linked set: one shared package repo (MindAttic.UiUx, served over jsDelivr) plus the sites that
+/// A permanently linked set: one monorepo (MindAttic.Web) whose package folder (cdnSubpath, MindAttic.Web.Shared) is served over jsDelivr, plus the sites that
 /// consume it. Deploying ANY member deploys the whole group (see src/linked.js).
 /// </summary>
 public sealed class LinkedGroup
@@ -53,6 +53,10 @@ public sealed class LinkedPackage
     [JsonPropertyName("repo")]      public string Repo      { get; set; } = "";
     [JsonPropertyName("branch")]    public string Branch    { get; set; } = "main";
     [JsonPropertyName("remote")]    public string Remote    { get; set; } = "origin";
+    /// <summary>Folder inside the repo that jsDelivr serves as the package: gh/&lt;repo&gt;@V&lt;n&gt;/&lt;cdnSubpath&gt;/...</summary>
+    [JsonPropertyName("cdnSubpath")] public string? CdnSubpath { get; set; }
+    /// <summary>The first release tag when the repo has no whole-number tag yet (e.g. V12).</summary>
+    [JsonPropertyName("firstTag")]  public string? FirstTag   { get; set; }
 }
 
 public sealed class SiteProfile

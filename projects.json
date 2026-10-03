@@ -1,5 +1,5 @@
 {
-  "$comment": "Canonical registry for MindAttic.Deploy. Two arrays: `sites` is verbatim root-site FTP uploads (mindattic.com root, mindatticcares.com, ryandebraal.com, plus the hyperspace and idiotproof-replays subfolders); `apps` is Blazor / GitHub-Actions-driven deploys (push-to-deploy; disabled entries print their note). Deploy = node src/deploy.js with a mode flag (--site/--sites/--uiux/--app/--apps); a bare run prints usage and exits 2. Asset versions are pinned per site by the linked deploy (below), not here. LINKED GROUPS (permanent): `linkedGroups` declares sets of sites that are inseparable from a shared package repo. Today `mindattic-web` = the MindAttic.UiUx jsDelivr asset package + ryandebraal.com + mindatticcares.com + mindattic.com. Deploying ANY member (`--site <slug>`, `--sites`, or `--uiux`) deploys the WHOLE group via src/linked.js: preflight (package repo clean, on main, not behind origin, manifest current) -> tag the package V<n+1> if HEAD is ahead of the latest tag and push main + the tag -> pin that tag in every site -> run the sites' preDeploy hooks (a hook with `tagArg` receives the tag) -> CDN gate (every asset the sites use must be live on jsDelivr at that tag, byte-exact) -> FTP the sites in the listed order (mindattic.com last: its sync hook runs there). `sites[]` order inside the group = FTP order. `--no-link` is the escape hatch for a one-site deploy. See docs/BIBLE.md (DEP-§4).",
+  "$comment": "Canonical registry for MindAttic.Deploy. Two arrays: `sites` is verbatim root-site FTP uploads (mindattic.com root, mindatticcares.com, ryandebraal.com, plus the hyperspace and idiotproof-replays subfolders); `apps` is Blazor / GitHub-Actions-driven deploys (push-to-deploy; disabled entries print their note). Deploy = node src/deploy.js with a mode flag (--site/--sites/--uiux/--app/--apps); a bare run prints usage and exits 2. Asset versions are pinned per site by the linked deploy (below), not here. LINKED GROUPS (permanent): `linkedGroups` declares sets of sites that are inseparable from a shared package. `mindattic-web` = the MindAttic.Web monorepo: its MindAttic.Web.Shared folder is the jsDelivr asset package (package.cdnSubpath) and ryandebraal.com, mindatticcares.com, Hyperspace and mindattic.com are sibling folders in the SAME git repo. Deploying ANY member (`--site <slug>`, `--sites`, or `--uiux`) deploys the WHOLE group via src/linked.js: preflight (repo clean, on main, not behind origin, manifest current) -> next tag (V<n+1>, or package.firstTag when the repo has no tags) -> rewrite the pins in the site pages, run the sites' preDeploy hooks (a hook with `tagArg` receives the tag) and stamp the pages -> commit 'Pin MindAttic.Web.Shared V<n>' -> tag that commit -> push main + the tag -> CDN gate (every asset the sites use must be live on jsDelivr at that tag, byte-exact) -> FTP the sites in the listed order. If HEAD already carries the latest tag and the pins match it, that tag is reused. `sites[]` order inside the group = FTP order. `--no-link` is the escape hatch for a one-site deploy. See docs/BIBLE.md (DEP-§4).",
 
   "apps": [
     {
@@ -11,10 +11,10 @@
       "disabled":      true,
       "disabledNote":  "Retired 2026-08-23 (author decision): Prose is local-only, single-user now, no hosted deployment target. Prose.Codex (the Blazor web host this pipeline built/published) was deleted 2026-08-13 (Epoch 4, 'Command-line only'); this entry had been silently broken since then. .github/workflows/azure-deploy.yml, Prose's infra/ Azure provisioning files, and docs/infra/AZURE_DEPLOY.md were all deleted in the same change that disabled this entry. Do not re-enable without a real reason to host Prose again.",
       "stageOnly":     ["v3/Prose.Codex/wwwroot"],
-      "commitMessage": "Sync MindAttic.UiUx for deploy ({utc})",
+      "commitMessage": "Sync MindAttic.Web.Shared for deploy ({utc})",
       "preDeploy": [
-        { "kind": "uiux-pull",    "required": true },
-        { "kind": "powershell",   "file": "../MindAttic.UiUx/sync/sync-prose.ps1", "required": true },
+        { "kind": "package-pull", "required": true },
+        { "kind": "powershell",   "file": "../MindAttic.Web/MindAttic.Web.Shared/sync/sync-prose.ps1", "required": true },
         { "kind": "dotnet-build", "project": "../Prose/v3/Prose.Codex/Prose.Codex.csproj", "configuration": "Release", "required": true },
         { "kind": "powershell",   "file": "../Prose/scripts/sync-audio-to-blob.ps1", "required": true }
       ]
@@ -124,47 +124,47 @@
 
   "linkedGroups": {
     "mindattic-web": {
-      "package": { "slug": "MindAttic.UiUx", "sourceDir": "../MindAttic.UiUx", "repo": "mindattic/MindAttic.UiUx", "branch": "main", "remote": "origin" },
-      "sites":   ["ryandebraal.com", "mindatticcares.com", "mindattic.com"]
+      "package": { "slug": "MindAttic.Web.Shared", "sourceDir": "../MindAttic.Web", "repo": "mindattic/MindAttic.Web", "cdnSubpath": "MindAttic.Web.Shared", "firstTag": "V12", "branch": "main", "remote": "origin" },
+      "sites":   ["ryandebraal.com", "mindatticcares.com", "hyperspace", "mindattic.com"]
     }
   },
 
   "sites": [
     {
       "slug":          "mindattic.com",
-      "sourceDir":     "../mindattic.com",
+      "sourceDir":     "../MindAttic.Web/mindattic.com",
       "ftpRemotePath": "/mindattic.com",
       "files":         ["index.htm"],
       "stampFile":     "index.htm",
       "preDeploy": [
-        { "kind": "uiux-pull",  "required": true },
-        { "kind": "powershell", "file": "../MindAttic.UiUx/sync/sync-mindattic-com.ps1", "args": ["-TargetIndex", "../mindattic.com/index.htm"], "tagArg": "-CyberspaceCdnTag", "required": true }
+        { "kind": "package-pull", "required": true },
+        { "kind": "powershell",   "file": "../MindAttic.Web/MindAttic.Web.Shared/sync/sync-mindattic-com.ps1", "args": ["-TargetIndex", "../MindAttic.Web/mindattic.com/index.htm"], "tagArg": "-CyberspaceCdnTag", "required": true }
       ]
     },
     {
       "slug":          "mindatticcares.com",
-      "sourceDir":     "../mindatticcares.com",
+      "sourceDir":     "../MindAttic.Web/mindatticcares.com",
       "ftpRemotePath": "/mindatticcares.com",
       "files":         ["index.htm"],
       "stampFile":     "index.htm"
     },
     {
       "slug":          "ryandebraal.com",
-      "sourceDir":     "../ryandebraal.com",
+      "sourceDir":     "../MindAttic.Web/ryandebraal.com",
       "ftpRemotePath": "/",
       "files":         ["index.htm"],
       "stampFile":     "index.htm"
     },
     {
       "slug":          "hyperspace",
-      "sourceDir":     "../Hyperspace",
+      "sourceDir":     "../MindAttic.Web/Hyperspace",
       "ftpRemotePath": "/mindattic.com/hyperspace",
       "files":         ["index.htm"],
       "stampFile":     "index.htm"
     },
     {
       "slug":          "idiotproof-replays",
-      "sourceDir":     "../mindattic.com/idiotproof",
+      "sourceDir":     "../MindAttic.Web/mindattic.com/idiotproof",
       "ftpRemotePath": "/mindattic.com/idiotproof",
       "uploadDir":     true
     }

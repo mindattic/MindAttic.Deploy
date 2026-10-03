@@ -11,7 +11,7 @@ public sealed class DeployRunner
     public DeployRunner(string repoRoot) => _repoRoot = repoRoot;
 
     /// <summary>
-    /// A member of a linked group (projects.json linkedGroups) deploys the WHOLE group: package tag + push, pin,
+    /// A member of a linked group (projects.json linkedGroups) deploys the WHOLE group: pin + commit + tag + push,
     /// CDN gate, then FTP for every site. <paramref name="noLink"/> is the escape hatch (named site only).
     /// </summary>
     public int RunSite(string? slug, bool all, bool dryRun, bool noLink = false, bool withTests = false)
@@ -26,7 +26,7 @@ public sealed class DeployRunner
         return RunNode(args);
     }
 
-    /// <summary>Publish MindAttic.UiUx and deploy the whole linked group (same as deploying any member site).</summary>
+    /// <summary>Publish MindAttic.Web.Shared and deploy the whole linked group (same as deploying any member site).</summary>
     public int RunUiux(bool dryRun, bool withTests)
     {
         var args = new List<string> { "src/deploy.js", "--uiux" };

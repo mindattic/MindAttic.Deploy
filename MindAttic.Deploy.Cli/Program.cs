@@ -23,7 +23,7 @@ app.Configure(config =>
 
     config.AddCommand<UiuxCommand>("uiux")
         .WithAlias("package")
-        .WithDescription("Publish MindAttic.UiUx (tag + push), pin it, verify the CDN, then deploy every linked site.")
+        .WithDescription("Publish MindAttic.Web.Shared (pin, commit, tag + push MindAttic.Web), verify the CDN, then deploy every linked site.")
         .WithExample("uiux")
         .WithExample("uiux", "--dry-run")
         .WithExample("uiux", "--with-tests");

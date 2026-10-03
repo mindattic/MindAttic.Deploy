@@ -1,6 +1,6 @@
 # MindAttic.Deploy
 
-One command deploys every MindAttic web property: FTPS uploads for the root sites, a gated linked release of the shared UiUx asset package, and push-to-deploy triggers for the Blazor apps.
+One command deploys every MindAttic web property: FTPS uploads for the root sites, a gated linked release of the MindAttic.Web monorepo and its shared asset package, and push-to-deploy triggers for the Blazor apps.
 
 ![Node.js](https://img.shields.io/badge/node.js-basic--ftp-339933) ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4) ![CLI](https://img.shields.io/badge/CLI-Spectre.Console-blueviolet) ![Tests](https://img.shields.io/badge/tests-node%3Atest-brightgreen) ![Status](https://img.shields.io/badge/status-active-brightgreen) ![License](https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey)
 
@@ -8,14 +8,14 @@ One command deploys every MindAttic web property: FTPS uploads for the root site
                     projects.json  (THE registry)
                     +--------------------------+--------------+
                     | sites[] + linkedGroups   |    apps[]    |
-                    | root sites (+ UiUx pkg)  |  Blazor/CI   |
+                    | MindAttic.Web root sites |  Blazor/CI   |
                     +------------+-------------+------+-------+
                                  |                    |
                                  v                    v
               +---------------- src/deploy.js -----------------+
               | site:   preDeploy hooks -> stamp -> FTPS       |
-              | linked: src/linked.js -- package tag + push -> |
-              |         pin -> hooks -> CDN gate -> FTPS       |
+              | linked: src/linked.js -- pin + hooks + stamp ->|
+              |         commit -> tag -> push -> CDN -> FTPS   |
               | app:    preDeploy hooks -> git commit/push     |
               | (no mode flag -> usage, exit 2)                |
               +--------------------+---------------------------+
@@ -31,14 +31,14 @@ Try it: `npm install` then `npm run deploy -- --site mindattic.com --dry-run` fo
 
 - Ship any MindAttic site or app from one place, with one credential file, instead of a `deploy.ps1` and a `node_modules/` in every repo.
 - Never publish a page that points at assets the CDN does not serve yet: the linked deploy checks every jsDelivr URL, byte for byte, before a single file is uploaded.
-- Release the shared UiUx package and the three sites that depend on it together, so a site can never drift onto a stale or missing asset tag.
+- Release the shared MindAttic.Web.Shared package and the four sites that depend on it together, from one repo, so a site can never drift onto a stale or missing asset tag.
 - Preview anything with `--dry-run` and see exactly which gate would stop a real run.
 - Mistype a flag and nothing happens: unknown flags and missing modes exit 2 instead of falling through to a deploy.
 - Drive it from a terminal, an interactive menu, CI or another launcher: the Node pipeline and the C# exe run the same engine.
 
 ## Features
 
-MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the `mindattic.com` root page, `mindatticcares.com`, `ryandebraal.com` (these three plus the `MindAttic.UiUx` asset package deploy together as one linked group), two verbatim sub-folder sites, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and MindAttic.Ideas enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no `deploy.ps1`, `deploy.bat`, `deploy.settings.json` or `node_modules/`): everything lives here.
+MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the `mindattic.com` root page, `mindatticcares.com`, `ryandebraal.com` and the `hyperspace` sub-folder (these four live in the [MindAttic.Web](https://github.com/mindattic/MindAttic.Web) monorepo next to its `MindAttic.Web.Shared` asset package and deploy together as one linked group), the `idiotproof-replays` sub-folder site, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and MindAttic.Ideas enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no `deploy.ps1`, `deploy.bat`, `deploy.settings.json` or `node_modules/`): everything lives here.
 
 Each MindAttic repo's GitHub README is its project page; this repo renders and uploads nothing for individual projects.
 
@@ -50,9 +50,9 @@ Two front doors drive the exact same engine:
 What it ships:
 
 - **Root and sub-sites**: verbatim FTPS upload of a file glob or a whole directory tree, with a Last-Updated stamp.
-- **The linked group**: tag and push the MindAttic.UiUx package, pin the tag in every site, verify the CDN, then upload every site in order.
+- **The linked group**: pin the next tag in every site page, run the hooks, stamp, commit, tag and push MindAttic.Web, verify the CDN, then upload every site in order.
 - **Blazor apps**: commit staged paths and push the branch, which fires the project's own GitHub Actions workflow.
-- **preDeploy hooks**: `uiux-pull`, `powershell` and `dotnet-build` steps before an upload or push.
+- **preDeploy hooks**: `package-pull`, `powershell` and `dotnet-build` steps before an upload or push.
 - **Soft-disabled apps**: a disabled app prints its `disabledNote` and never half-fires.
 
 ## Quick start
@@ -62,9 +62,9 @@ Prerequisites: Node.js, an FTP credential (see [Secrets and credential handling]
 ```bash
 npm install
 npm run deploy -- --sites                # every verbatim root/sub-site (the linked group goes through the linked flow)
-npm run deploy -- --site mindattic.com   # ANY linked site deploys the WHOLE group: UiUx package + 3 sites
-npm run deploy -- --uiux --dry-run       # preview that linked deploy: nothing tagged, pushed, written or uploaded
-npm run deploy -- --site hyperspace      # a site outside the linked group deploys on its own
+npm run deploy -- --site mindattic.com   # ANY linked site deploys the WHOLE group: MindAttic.Web.Shared + 4 sites
+npm run deploy -- --uiux --dry-run       # preview that linked deploy: nothing written, committed, tagged, pushed or uploaded
+npm run deploy -- --site idiotproof-replays   # a site outside the linked group deploys on its own
 npm run deploy -- --apps                 # every enabled Blazor/CI app
 npm run all                              # sites + apps, back-to-back
 ```
@@ -89,11 +89,11 @@ A mode flag is required: --site, --sites, --uiux, --app or --apps.
 
 Flags (also accept --flag=value form):
   --site <slug>        site mode:    deploy a root site (a linked-group member deploys the WHOLE group:
-                       package tag + push, pin, CDN gate, then FTP for every site in the group)
+                       pin + commit + tag + push MindAttic.Web, CDN gate, then FTP for every site in the group)
   --sites              site mode:    deploy every root site (linked group first, via the linked flow)
-  --uiux | --package   linked mode:  publish MindAttic.UiUx and deploy the whole linked group
+  --uiux | --package   linked mode:  publish MindAttic.Web.Shared and deploy the whole linked group
   --no-link            site mode:    ESCAPE HATCH -- deploy only the named site (loud warning)
-  --with-tests         linked mode:  also run MindAttic.UiUx/tests as a gate before publishing
+  --with-tests         linked mode:  also run MindAttic.Web.Shared/tests as a gate before publishing
   --app <slug>         app mode:     deploy a single Blazor app via GitHub Actions
   --apps               app mode:     deploy every enabled app
   --include-disabled   app mode:     include disabled apps in --apps iteration
@@ -111,21 +111,21 @@ Everything that ships via FTP or via a `git push` that fires a GitHub Actions wo
 | Key | What it is | Shipped how | Entries |
 |---|---|---|---|
 | `sites[]` | Verbatim root/sub-site upload, not templated | FTPS upload of a `files[]` glob (or a whole directory tree via `uploadDir`) to `ftpRemotePath` | mindattic.com (root), mindatticcares.com, ryandebraal.com, hyperspace, idiotproof-replays |
-| `linkedGroups` | Sites that are inseparable from a shared package repo | The linked flow ([Linked deploy](#linked-deploy)): package tag + push, pin, CDN gate, then FTP of every member site | `mindattic-web` = MindAttic.UiUx + ryandebraal.com + mindatticcares.com + mindattic.com |
+| `linkedGroups` | Sites that are inseparable from a shared package in the same repo | The linked flow ([Linked deploy](#linked-deploy)): pin, hooks, stamp, commit, tag, push, CDN gate, then FTP of every member site | `mindattic-web` = MindAttic.Web (package folder MindAttic.Web.Shared) + ryandebraal.com + mindatticcares.com + hyperspace + mindattic.com |
 | `apps[]` | Blazor / GitHub-Actions-driven deploy | `git commit` (of `stageOnly` paths) + `git push <branch>`, which fires the project's own `.github/workflows/<workflow>` (the real Azure push happens there, not here) | cursory, personagallery, ideas (enabled); prose (local-only), idiotproof, taxratecollector, thinktank, tutor, mindatticfrontend (disabled, each with a `disabledNote` explaining exactly why) |
 
 Explicitly out of scope:
 
 - **Project pages.** Every MindAttic repo's GitHub README is its own project page (full docs plus the promo); nothing here renders or uploads per-project pages.
 - **Remote cleanup.** This repo never deletes files on the FTP host; stale remote files are removed by hand.
-- **UiUx sources.** `MindAttic.UiUx` owns the actual component sources and shared assets (fonts, logos, theme art, the Cyberspace effects). The sites pull them at runtime from jsDelivr; this repo never edits them. It does publish the package for the linked group (tag + push) and re-pin it in the sites (see [Linked deploy](#linked-deploy)), and it invokes UiUx's splice scripts as `preDeploy` hooks (for `mindattic.com`, and for the disabled Prose app).
+- **Package sources.** `MindAttic.Web.Shared` (a folder of the MindAttic.Web monorepo) owns the actual component sources and shared assets (fonts, logos, theme art, the Cyberspace effects). The sites pull them at runtime from jsDelivr; this repo never edits them. It does re-pin the sites' pages, commit those pins, and tag and push MindAttic.Web for the linked group (see [Linked deploy](#linked-deploy)), and it invokes the package's splice scripts as `preDeploy` hooks (for `mindattic.com`, and for the disabled Prose app).
 - **Per-project deploy files.** A `scripts/cli/`, `deploy.ps1`, `deploy.bat` or `deploy.settings.json` in another repo is not used by anything: delete it rather than maintain it.
 
 ## How the pipeline works
 
 ### Site mode
 
-`--site <slug>` and `--sites`. A member of a linked group never takes this path on its own: `--site <member>` and `--sites` send the group through the [linked flow](#linked-deploy) (unless `--no-link`). Plain site mode covers the sites outside the group (`hyperspace`, `idiotproof-replays`) and `--no-link` runs.
+`--site <slug>` and `--sites`. A member of a linked group never takes this path on its own: `--site <member>` and `--sites` send the group through the [linked flow](#linked-deploy) (unless `--no-link`). Plain site mode covers the site outside the group (`idiotproof-replays`) and `--no-link` runs (a `--no-link` stamp of a MindAttic.Web page is left uncommitted).
 
 1. Runs the site's `preDeploy[]` hooks (see below).
 2. If `stampFile` is set, rewrites (or inserts) a `<!-- Last Updated: <ISO-8601 UTC> -->` HTML comment at the top of that file. BOM-safe and idempotent: it replaces an existing stamp rather than stacking a new one on top.
@@ -147,7 +147,7 @@ Explicitly out of scope:
 
 | Kind | What it does | Notes |
 |---|---|---|
-| `uiux-pull` | `git -C ../MindAttic.UiUx pull --no-edit --no-rebase` | Fails loudly if the sibling is not a git repo. Skipped inside the linked flow (its preflight already verified the package). |
+| `package-pull` | `git -C <linked package sourceDir> pull --no-edit --no-rebase` (today `../MindAttic.Web`) | The folder comes from `linkedGroups` in `projects.json`. Fails loudly if it is not a git repo. Skipped inside the linked flow (its preflight already verified the repo). |
 | `powershell` | `powershell -NoProfile -ExecutionPolicy Bypass -File <file> [args...]` | `file` is resolved relative to the repo root; relative-looking `args` are resolved too. In the linked flow a hook with `tagArg` also receives the release tag. |
 | `dotnet-build` | `dotnet build <project> -c <configuration> --nologo` | `configuration` defaults to `Release`. |
 
@@ -155,46 +155,50 @@ Every hook entry can set `"required": false` to make a failure non-fatal (it log
 
 ## Linked deploy
 
-`MindAttic.UiUx` (the shared jsDelivr asset package) and the three sites that load their fonts, logos, theme art and Cyberspace engine from it are permanently linked. The group is declared in `projects.json` under `linkedGroups`:
+The [MindAttic.Web](https://github.com/mindattic/MindAttic.Web) monorepo holds the shared jsDelivr asset package (its `MindAttic.Web.Shared` folder) and the four sites that load their fonts, logos, theme art and Cyberspace engine from it, as sibling folders of one git repo. They are permanently linked. The group is declared in `projects.json` under `linkedGroups`:
 
 ```jsonc
 "linkedGroups": {
   "mindattic-web": {
-    "package": { "slug": "MindAttic.UiUx", "sourceDir": "../MindAttic.UiUx", "repo": "mindattic/MindAttic.UiUx", "branch": "main", "remote": "origin" },
-    "sites":   ["ryandebraal.com", "mindatticcares.com", "mindattic.com"]   // FTP order
+    "package": { "slug": "MindAttic.Web.Shared", "sourceDir": "../MindAttic.Web", "repo": "mindattic/MindAttic.Web",
+                 "cdnSubpath": "MindAttic.Web.Shared", "firstTag": "V12", "branch": "main", "remote": "origin" },
+    "sites":   ["ryandebraal.com", "mindatticcares.com", "hyperspace", "mindattic.com"]   // FTP order
   }
 }
 ```
 
-The package tag this flow publishes and pins is the only asset version in the system; there is no global version key in `projects.json`.
+`sourceDir` is the repo; `cdnSubpath` is the folder jsDelivr serves as the package, so every asset URL is `https://cdn.jsdelivr.net/gh/mindattic/MindAttic.Web@V<n>/MindAttic.Web.Shared/<path>`. `firstTag` is the release tag used while the repo has no whole-number tag yet. Every member site's `sourceDir` must be inside the repo (`../MindAttic.Web/<site>`). The tag this flow publishes and pins is the only asset version in the system; there is no global version key in `projects.json`.
 
-Deploying any member (`--site ryandebraal.com`, `--site mindatticcares.com`, `--site mindattic.com`, `--sites`, or `--uiux`) runs the same flow (`src/linked.js`). It aborts before any FTP upload if a gate fails:
+Deploying any member (`--site ryandebraal.com`, `--site mindatticcares.com`, `--site hyperspace`, `--site mindattic.com`, `--sites`, or `--uiux`) runs the same flow (`src/linked.js`). It aborts before any FTP upload if a gate fails:
 
 | Step | Name | What it does or checks |
 |---|---|---|
-| 1 | **Preflight** | Package repo is on `main` with a clean working tree (never auto-committed), `origin` reachable, not behind or diverged from `origin/main`, latest tag is an ancestor of `HEAD`, no whole-number tag exists only locally (a leftover from a publish whose push failed; it would leave a gap in `V1..Vn`) unless it is at `HEAD`, `tools\build-asset-manifest.ps1 -Verify` passes, every site's page exists, FTP secrets resolve, no page pins a tag newer than the release tag. |
-| 2 | **Publish** | If `HEAD` already carries the latest `V<n>` tag it is reused; otherwise tag `V<n+1>` (annotated; message lists the commits since the last tag) and `git push origin main` plus the tag. Never force. A tag that already exists on origin at a different commit aborts (tags are immutable). |
-| 3 | **Pin** | Every `MindAttic.UiUx@V<n>` in each site's `pinFiles` (default: its `stampFile`, that is `index.htm`) becomes the release tag. Idempotent; leaves npm and other jsDelivr URLs alone. Uploaded files outside `pinFiles` are never pinned or scanned (none today: each linked site uploads only its `index.htm`). |
-| 4 | **Prepare** | Runs each site's `preDeploy` hooks. A powershell hook with `"tagArg": "-CyberspaceCdnTag"` receives the tag; the `uiux-pull` hook is skipped (step 1 already verified or published the package). |
-| 5 | **CDN gate** | Every UiUx URL the pages use must be live on jsDelivr at the release tag: HTTP 200, `access-control-allow-origin: *`, `content-length` equal to the file in the package tree. Checked: literal URLs plus every file in `assets-manifest.json` under each site's domain folder (so images a page builds at runtime from a base prefix like `ASSET_BASE + 'themes/...'` are covered). URLs ending in `/` are base prefixes and doc placeholders like `@<tag>/<path>` are ignored. New tags can lag: failures are retried in shared backoff rounds (about 3 minutes). |
-| 6 | **FTP** | Uploads the sites in order over one connection (stamp + `files[]`), reconnecting if a failed site left it closed. A failing site does not stop the rest; non-zero exit if any failed; `--sites` then deploys non-member sites. Prints a table and reminds you when a site repo has uncommitted or unpushed changes (the deploy never commits them). |
+| 1 | **Preflight** | The repo is on `main` with a clean working tree, `origin` reachable, not behind or diverged from `origin/main`, latest tag is an ancestor of `HEAD`, no whole-number tag exists only locally unless it is at `HEAD` (a leftover from a publish whose push failed; skipping past it would leave a gap), no tag moved on origin, `MindAttic.Web.Shared\tools\build-asset-manifest.ps1 -Verify` passes, every site's page exists inside the repo, FTP secrets resolve. |
+| 2 | **Release tag** | If `HEAD` already carries the latest `V<n>` tag and every page is pinned to it, that tag is **reused** and steps 3-5 are skipped. Otherwise the release tag is `V<n+1>` (or `firstTag` when there is no tag yet). Gates: no page pins a tag newer than the release tag, every literal package URL exists in the package tree, the manifest is not stale, nothing pins `@main`. |
+| 3 | **Prepare** | Every `MindAttic.Web@V<n>/MindAttic.Web.Shared/` pin in each site's `pinFiles` (default: its `stampFile`, that is `index.htm`) becomes the release tag (idempotent; npm, other repos' and non-package URLs are untouched), each site's `preDeploy` hooks run (a powershell hook with `"tagArg": "-CyberspaceCdnTag"` receives the tag; `package-pull` is skipped), and each `stampFile` gets its Last-Updated stamp. |
+| 4 | **Commit** | Commits the changed site files as `Pin MindAttic.Web.Shared V<n>`. If a hook changed anything outside the group's site folders the run aborts. Any failure in steps 3-4 restores the working tree (`reset --hard`, `clean -fd`) to the clean state preflight verified. |
+| 5 | **Tag** | Annotated `V<n>` on that commit; the message lists the commit subjects since the previous tag. |
+| 6 | **Push** | `git push origin main`, then the tag. Never force. |
+| 7 | **CDN gate** | Every package URL the pages use must be live on jsDelivr at the release tag: HTTP 200, `access-control-allow-origin: *`, `content-length` equal to the file in `MindAttic.Web.Shared`. Checked: literal URLs plus every file in `assets-manifest.json` under each site's domain folder (so images a page builds at runtime from a base prefix like `ASSET_BASE + 'themes/...'` are covered). URLs ending in `/` are base prefixes and doc placeholders like `@<tag>/<path>` are ignored. New tags can lag: failures are retried in shared backoff rounds (about 3 minutes). |
+| 8 | **FTP** | Uploads the committed pages in order over one connection (no second stamp), reconnecting if a failed site left it closed. A failing site does not stop the rest; non-zero exit if any failed; `--sites` then deploys non-member sites. Prints a table and whether the repo is clean and in sync with `origin/main`. |
 
 ```bash
 npm run deploy -- --site mindattic.com --dry-run   # read-only plan: [WOULD ABORT] lines show gates that would stop a real run
 npm run deploy -- --site mindattic.com             # the real thing (same as --site ryandebraal.com / --uiux)
-npm run deploy -- --uiux --with-tests              # also run MindAttic.UiUx\tests first
+npm run deploy -- --uiux --with-tests              # also run MindAttic.Web.Shared\tests first
 npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site only (prints a warning)
 ```
 
 Things to know:
 
-- **Commit the package first.** A dirty `MindAttic.UiUx` tree aborts the run; commit your asset or component changes, then deploy.
-- **Pushing main of MindAttic.UiUx** can trigger its `sync-subscribers` GitHub workflow (it opens review PRs in subscriber repos; it merges nothing). Add `[skip ci]` to the package commit message to suppress it.
-- The package is published before the CDN gate (the gate needs the tag to exist). If the gate fails the tag stays (immutable) and nothing is uploaded; fix and re-run.
-- If a push is rejected, the run aborts cleanly (nothing uploaded) and the new tag stays local; the next run, with `HEAD` unchanged, resumes from it and pushes it.
+- **Commit your work first.** Any uncommitted change in MindAttic.Web aborts the run; the deploy commits only its own pins, splice output and stamps.
+- **After a deploy the repo is clean and pushed**: the pins and stamps are in the `Pin MindAttic.Web.Shared V<n>` commit that the tag points at.
+- **Pushing main of MindAttic.Web** can trigger its `sync-subscribers` GitHub workflow when the push touches the package paths it watches (it opens review PRs; it merges nothing). The pin commit itself touches only site folders.
+- The tag is pushed before the CDN gate (the gate needs the tag to exist). If the gate fails the tag stays (immutable) and nothing is uploaded; fix the cause and re-run: `HEAD` still carries the tag with matching pins, so it is reused.
+- If a push is rejected, the run aborts cleanly (nothing uploaded) and the commit and tag stay local; the next run reuses them and pushes.
 - `--no-link` requires `--site` or `--sites`, and `--with-tests` requires a linked deploy; both exit 2 otherwise instead of being silently ignored.
-- Each linked site uploads only its `index.htm` (a repo's generated `README.htm` is documentation, not part of the site). `mindattic.com`'s only hooks are `uiux-pull` (skipped inside the linked flow) and the Cyberspace splice.
-- `--dry-run` runs steps 1-5 read-only: no tag, push, pin edit, hook, FTP connect or upload. If the release tag is not published yet, it says the live CDN check "would run after the push".
+- Each linked site uploads only its `index.htm` (a generated `README.htm` is documentation, not part of the site). `mindattic.com`'s only hooks are `package-pull` (skipped inside the linked flow) and the Cyberspace splice.
+- `--dry-run` changes nothing: no fetch, pin edit, hook, stamp, commit, tag, push, FTP connect or upload. It prints the whole plan; if the release tag is not published yet, it says the live CDN check "would run after the push".
 - Design canon: [docs/BIBLE.md](docs/BIBLE.md) (architecture §4, laws §5). Tests: `npm test`.
 
 ## Commands
@@ -207,9 +211,9 @@ The Node pipeline is canonical.
 |---|---|
 | `npm run deploy -- --site <slug>` | Deploy one root or sub site (hooks + stamp + FTPS). A linked-group member deploys the whole group ([Linked deploy](#linked-deploy)). |
 | `npm run deploy -- --sites` | Deploy every entry in `sites[]` (the linked group first, via the linked flow, then the rest). |
-| `npm run deploy -- --uiux` (alias `--package`) | Publish MindAttic.UiUx (tag + push), pin it, verify the CDN, then deploy every linked site. |
+| `npm run deploy -- --uiux` (alias `--package`) | Publish MindAttic.Web.Shared (pin, commit, tag + push MindAttic.Web), verify the CDN, then deploy every linked site. |
 | `npm run deploy -- --site <slug> --no-link` | Escape hatch: deploy only that site, skipping the linked flow (loud warning). |
-| `npm run deploy -- --uiux --with-tests` | Linked deploy that also runs `MindAttic.UiUx/tests` (`npm run test:local`) as a gate before publishing. |
+| `npm run deploy -- --uiux --with-tests` | Linked deploy that also runs `MindAttic.Web.Shared/tests` (`npm run test:local`) as a gate before publishing. |
 | `npm run deploy -- --app <slug>` | Deploy one Blazor/CI app (hooks + commit + push). |
 | `npm run deploy -- --apps` | Deploy every enabled app (`--include-disabled` to also print disabled notes). |
 | `npm run deploy -- <mode> --dry-run` | Preview any of the above without FTP upload or git push. Plain site and app modes still run their preDeploy hooks; the linked flow runs none of them (hooks mutate files) and writes, tags and pushes nothing. `--dry-run` alone is not a mode and exits 2. |
@@ -228,7 +232,7 @@ Built from `MindAttic.Deploy.Cli/` (`net10.0`, `AssemblyName=MindAttic.Deploy`, 
 |---|---|
 | `MindAttic.Deploy` (no args) | Interactive multi-select menu across sites and apps (`MainMenuCommand`). Space toggles, `A` selects all, Enter confirms; nothing selected means exit without deploying. Selecting every site or every app collapses to one `--sites` or `--apps --include-disabled` invocation; several ticked members of a linked group run the group once. |
 | `MindAttic.Deploy site --slug <slug> [--dry-run] [--no-link] [--with-tests]` | Deploy one root or sub site (`--site`); a linked member deploys its whole group. Use `--all` instead of `--slug` for every site (`--sites`). |
-| `MindAttic.Deploy uiux [--dry-run] [--with-tests]` (alias `package`) | The linked deploy started from the package (`--uiux`). |
+| `MindAttic.Deploy uiux [--dry-run] [--with-tests]` (alias `package`) | The linked deploy started from the package (`--uiux`, publishes MindAttic.Web.Shared). |
 | `MindAttic.Deploy app --slug <slug> [--dry-run] [--include-disabled]` | Deploy one Blazor/GitHub-Actions app; `--all` instead of `--slug` deploys every app. |
 | `MindAttic.Deploy all [--dry-run]` | Non-interactive "deploy everything": `--sites`, then `--apps --include-disabled`, back-to-back. Meant for scripts, CI and slash commands that do not want to drive an interactive prompt. |
 | `MindAttic.Deploy list` | Print every target (slug, sourceDir and remote for sites; slug, repo, branch, workflow and enabled or disabled for apps) as Spectre tables. |
@@ -244,9 +248,9 @@ Every MindAttic project repo that actually ships something has a thin `/deploy` 
 # App projects (Cursory, PersonaGallery, MindAttic.Ideas, and the disabled ones):
 cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --app <slug>
 
-# The linked group (MindAttic.UiUx, ryandebraal.com, mindatticcares.com, mindattic.com):
+# The linked group (MindAttic.Web: MindAttic.Web.Shared, ryandebraal.com, mindatticcares.com, Hyperspace, mindattic.com):
 # every one of their /deploy shims runs the SAME linked flow (see "Linked deploy" above).
-cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --uiux              # from MindAttic.UiUx
+cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --uiux              # from MindAttic.Web.Shared
 cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --site <slug>       # from a site (whole group deploys)
 ```
 
@@ -258,7 +262,7 @@ A project that only needs a public page needs nothing here: its GitHub README is
 
 For something that actually ships, pick exactly one array in `projects.json`. That is the entire procedure: no scaffold script, no per-project files.
 
-**Verbatim root or sub site**: append to `sites[]` with `sourceDir` (relative to the repo root), `ftpRemotePath`, and either `files[]` (a glob or exact filenames) or `uploadDir: true` (recursive, non-destructive tree upload). Optional `stampFile` and `preDeploy[]`. A site that loads assets from `MindAttic.UiUx` belongs in the linked group: add it to `linkedGroups.mindattic-web.sites` (the listed order is the FTP order) and, if its pinned URLs live outside its `stampFile`, set `pinFiles`. Then:
+**Verbatim root or sub site**: append to `sites[]` with `sourceDir` (relative to the repo root), `ftpRemotePath`, and either `files[]` (a glob or exact filenames) or `uploadDir: true` (recursive, non-destructive tree upload). Optional `stampFile` and `preDeploy[]`. A site that loads assets from `MindAttic.Web.Shared` belongs in the linked group: put its folder in MindAttic.Web, add it to `linkedGroups.mindattic-web.sites` (the listed order is the FTP order) and, if its pinned URLs live outside its `stampFile`, set `pinFiles`. Then:
 
 ```bash
 npm run deploy -- --site <slug>
@@ -306,7 +310,7 @@ Credentials never live in source or in any uploaded file: `secrets/ftp.json` is 
 projects.json                    canonical registry: sites[], apps[], linkedGroups
 src/
   deploy.js                      the pipeline (site / app modes); FTPS via basic-ftp; preDeploy hook runner
-  linked.js                      the linked deploy (package tag + push, pin, CDN gate, FTP)
+  linked.js                      the linked deploy (pin, hooks, stamp, commit, tag, push, CDN gate, FTP)
 test/
   linked.test.js                 node:test suite (npm test)
 MindAttic.Deploy.Cli/            C# console app (net10.0, Spectre.Console.Cli, assembly name MindAttic.Deploy)
@@ -355,7 +359,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1
 run.bat --version
 ```
 
-`npm test` runs `test/linked.test.js` (node:test): the linked deploy against throwaway git repos, a local HTTP stand-in for jsDelivr and a fake FTP client, plus the CLI flag guards (unknown flags, linked-only modifiers, no mode flag) and registry consistency. Plain site and app modes and the C# CLI have no automated tests (`dotnet test` has nothing to run); they are proven by a clean build plus ad-hoc `--dry-run` invocations. See [docs/rfc/0001-test-harness.md](docs/rfc/0001-test-harness.md) for the plan to close that gap and [the user stories](docs/USER_STORIES.md) for which stories are blocked on it.
+`npm test` runs `test/linked.test.js` (node:test): the linked deploy against a throwaway monorepo (a `Shared/` package folder plus site folders) with a bare origin, a local HTTP stand-in for jsDelivr that serves the published tag, and a fake FTP client, plus the CLI flag guards (unknown flags, linked-only modifiers, no mode flag) and registry consistency. Plain site and app modes and the C# CLI have no automated tests (`dotnet test` has nothing to run); they are proven by a clean build plus ad-hoc `--dry-run` invocations. See [docs/rfc/0001-test-harness.md](docs/rfc/0001-test-harness.md) for the plan to close that gap and [the user stories](docs/USER_STORIES.md) for which stories are blocked on it.
 
 ## CI workflows
 
@@ -370,12 +374,12 @@ There is no CI deploy workflow: deploys run from the dev box.
 | Term | Meaning |
 |---|---|
 | **Root site / sub-site** | A verbatim FTPS-uploaded `sites[]` entry, not templated; only its Last-Updated stamp (and, for the linked group, its package pins) are rewritten. |
-| **Linked group** | A package repo plus the sites that load from it, always deployed together (`linkedGroups`; today `mindattic-web`). |
-| **Release tag** | The whole-number `V<n>` tag of MindAttic.UiUx a linked deploy publishes (or reuses) and pins in the sites. |
+| **Linked group** | One repo holding a jsDelivr package folder plus the site folders that load from it, always deployed together (`linkedGroups`; today `mindattic-web` = MindAttic.Web). |
+| **Release tag** | The whole-number `V<n>` tag of MindAttic.Web a linked deploy publishes (or reuses) and pins in the sites (`MindAttic.Web@V<n>/MindAttic.Web.Shared/`). |
 | **CDN gate** | The pre-FTP check that every package asset the sites use is live on jsDelivr at the release tag with the exact bytes. |
 | **App** | An `apps[]` entry: this repo commits and pushes a branch; the project's own GitHub Actions workflow performs the actual (Azure) deploy. |
 | **Mode flag** | One of `--site`, `--sites`, `--uiux`, `--app`, `--apps`. `deploy.js` exits 2 without one. |
-| **preDeploy hook** | A step run before a site or app's upload or push: `uiux-pull`, `powershell`, or `dotnet-build`. |
+| **preDeploy hook** | A step run before a site or app's upload or push: `package-pull`, `powershell`, or `dotnet-build`. |
 | **Front door** | An entry point onto the one deploy engine: either the `npm run` scripts or `MindAttic.Deploy.exe`. |
 | **Stamp** | The `<!-- Last Updated: <ISO-8601> -->` comment written into a site's `stampFile` on every deploy. |
 | **Dry run** | `--dry-run` with a mode flag: plain site and app modes still execute preDeploy hooks (they can mutate local state), but the FTP upload or git commit and push is skipped and only previewed; the linked flow runs nothing that writes. |
@@ -396,4 +400,4 @@ This README covers how to build, run, and extend MindAttic.Deploy. For architect
 
 This repo has no LICENSE file. All rights reserved.
 
-Part of [MindAttic](https://mindattic.com) — see more projects at [github.com/mindattic](https://github.com/mindattic). Related: [MindAttic.UiUx](https://github.com/mindattic/MindAttic.UiUx), [mindattic.com](https://github.com/mindattic/mindattic.com), [ryandebraal.com](https://github.com/mindattic/ryandebraal.com), [mindatticcares.com](https://github.com/mindattic/mindatticcares.com).
+Part of [MindAttic](https://mindattic.com) — see more projects at [github.com/mindattic](https://github.com/mindattic). Related: [MindAttic.Web](https://github.com/mindattic/MindAttic.Web) (MindAttic.Web.Shared, mindattic.com, ryandebraal.com, mindatticcares.com, Hyperspace), [IdiotProof](https://github.com/mindattic/IdiotProof).
