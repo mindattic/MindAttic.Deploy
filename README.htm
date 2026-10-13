@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MindAttic.Deploy</title>
-<meta name="description" content="One command deploys every MindAttic web property: FTPS uploads for the root sites, a gated linked release of the MindAttic.Web monorepo and its shared asset package, and push-to-deploy triggers for the Blazor apps.">
+<meta name="description" content="One command deploys every MindAttic web property: FTPS uploads for the root sites, a gated linked release of the MindAttic.Components asset package and the MindAttic.Web sites that load it, and push-to-deploy triggers...">
 <meta name="generator" content="MindAttic Codex build-readme.ps1">
-<meta name="generated" content="2026-10-03">
+<meta name="generated" content="2026-10-13">
 <style>:root{
   --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
   --border:#30363d;
@@ -111,7 +111,7 @@ pre:hover .cpbtn{opacity:1}
   </nav>
   <main id="content">
 <h1 id="mindatticdeploy">MindAttic.Deploy</h1>
-<p>One command deploys every MindAttic web property: FTPS uploads for the root sites, a gated linked release of the MindAttic.Web monorepo and its shared asset package, and push-to-deploy triggers for the Blazor apps.</p>
+<p>One command deploys every MindAttic web property: FTPS uploads for the root sites, a gated linked release of the MindAttic.Components asset package and the MindAttic.Web sites that load it, and push-to-deploy triggers for the Blazor apps.</p>
 <p><img src="https://img.shields.io/badge/node.js-basic--ftp-339933" alt="Node.js"> <img src="https://img.shields.io/badge/.NET-10.0-512BD4" alt=".NET"> <img src="https://img.shields.io/badge/CLI-Spectre.Console-blueviolet" alt="CLI"> <img src="https://img.shields.io/badge/tests-node%3Atest-brightgreen" alt="Tests"> <img src="https://img.shields.io/badge/status-active-brightgreen" alt="Status"> <img src="https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey" alt="License"></p>
 <pre><code class="language-text">                    projects.json  (THE registry)
                     +--------------------------+--------------+
@@ -136,13 +136,13 @@ pre:hover .cpbtn{opacity:1}
 <ul>
 <li>Ship any MindAttic site or app from one place, with one credential file, instead of a <code>deploy.ps1</code> and a <code>node_modules/</code> in every repo.</li>
 <li>Never publish a page that points at assets the CDN does not serve yet: the linked deploy checks every jsDelivr URL, byte for byte, before a single file is uploaded.</li>
-<li>Release the shared MindAttic.Web.Shared package and the four sites that depend on it together, from one repo, so a site can never drift onto a stale or missing asset tag.</li>
+<li>Release the shared MindAttic.Components package and the four sites that depend on it together, from one repo, so a site can never drift onto a stale or missing asset tag.</li>
 <li>Preview anything with <code>--dry-run</code> and see exactly which gate would stop a real run.</li>
 <li>Mistype a flag and nothing happens: unknown flags and missing modes exit 2 instead of falling through to a deploy.</li>
 <li>Drive it from a terminal, an interactive menu, CI or another launcher: the Node pipeline and the C# exe run the same engine.</li>
 </ul>
 <h2 id="features">Features</h2>
-<p>MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the <code>mindattic.com</code> root page, <code>mindatticcares.com</code>, <code>ryandebraal.com</code> and the <code>hyperspace</code> sub-folder (these four live in the <a href="https://github.com/mindattic/MindAttic.Web">MindAttic.Web</a> monorepo next to its <code>MindAttic.Web.Shared</code> asset package and deploy together as one linked group), the <code>idiotproof-replays</code> sub-folder site, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and MindAttic.Ideas enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no <code>deploy.ps1</code>, <code>deploy.bat</code>, <code>deploy.settings.json</code> or <code>node_modules/</code>): everything lives here.</p>
+<p>MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the <code>mindattic.com</code> root page, <code>mindatticcares.com</code>, <code>ryandebraal.com</code> and the <code>hyperspace</code> sub-folder (these four live in the <a href="https://github.com/mindattic/MindAttic.Web">MindAttic.Web</a> repo, load their shared assets from the <a href="https://github.com/mindattic/MindAttic.Components">MindAttic.Components</a> package, and deploy together with it as one linked group), the <code>idiotproof-replays</code> sub-folder site, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and MindAttic.Ideas enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no <code>deploy.ps1</code>, <code>deploy.bat</code>, <code>deploy.settings.json</code> or <code>node_modules/</code>): everything lives here.</p>
 <p>Each MindAttic repo's GitHub README is its project page; this repo renders and uploads nothing for individual projects.</p>
 <p>Two front doors drive the exact same engine:</p>
 <ul>
@@ -161,7 +161,7 @@ pre:hover .cpbtn{opacity:1}
 <p>Prerequisites: Node.js, an FTP credential (see <a href="#secrets-and-credential-handling">Secrets and credential handling</a>), and for the C# front door the .NET 10 SDK.</p>
 <pre><code class="language-bash">npm install
 npm run deploy -- --sites                # every verbatim root/sub-site (the linked group goes through the linked flow)
-npm run deploy -- --site mindattic.com   # ANY linked site deploys the WHOLE group: MindAttic.Web.Shared + 4 sites
+npm run deploy -- --site mindattic.com   # ANY linked site deploys the WHOLE group: MindAttic.Components + 4 sites
 npm run deploy -- --uiux --dry-run       # preview that linked deploy: nothing written, committed, tagged, pushed or uploaded
 npm run deploy -- --site idiotproof-replays   # a site outside the linked group deploys on its own
 npm run deploy -- --apps                 # every enabled Blazor/CI app
@@ -180,9 +180,9 @@ Flags (also accept --flag=value form):
   --site &lt;slug&gt;        site mode:    deploy a root site (a linked-group member deploys the WHOLE group:
                        pin + commit + tag + push MindAttic.Web, CDN gate, then FTP for every site in the group)
   --sites              site mode:    deploy every root site (linked group first, via the linked flow)
-  --uiux | --package   linked mode:  publish MindAttic.Web.Shared and deploy the whole linked group
+  --uiux | --package   linked mode:  publish MindAttic.Components and deploy the whole linked group
   --no-link            site mode:    ESCAPE HATCH -- deploy only the named site (loud warning)
-  --with-tests         linked mode:  also run MindAttic.Web.Shared/tests as a gate before publishing
+  --with-tests         linked mode:  also run MindAttic.Components/web/tests as a gate before publishing
   --app &lt;slug&gt;         app mode:     deploy a single Blazor app via GitHub Actions
   --apps               app mode:     deploy every enabled app
   --include-disabled   app mode:     include disabled apps in --apps iteration
@@ -207,9 +207,9 @@ Run: node src/deploy.js [flags]</code></pre>
 </tr>
 <tr>
 <td><code>linkedGroups</code></td>
-<td>Sites that are inseparable from a shared package in the same repo</td>
+<td>Sites that are inseparable from a shared package (in its repo, or all in one other repo)</td>
 <td>The linked flow (<a href="#linked-deploy">Linked deploy</a>): pin, hooks, stamp, commit, tag, push, CDN gate, then FTP of every member site</td>
-<td><code>mindattic-web</code> = MindAttic.Web (package folder MindAttic.Web.Shared) + ryandebraal.com + mindatticcares.com + hyperspace + mindattic.com</td>
+<td><code>mindattic-web</code> = MindAttic.Components (package folder <code>web</code>) + ryandebraal.com + mindatticcares.com + hyperspace + mindattic.com</td>
 </tr>
 <tr>
 <td><code>apps[]</code></td>
@@ -222,7 +222,7 @@ Run: node src/deploy.js [flags]</code></pre>
 <ul>
 <li><strong>Project pages.</strong> Every MindAttic repo's GitHub README is its own project page (full docs plus the promo); nothing here renders or uploads per-project pages.</li>
 <li><strong>Remote cleanup.</strong> This repo never deletes files on the FTP host; stale remote files are removed by hand.</li>
-<li><strong>Package sources.</strong> <code>MindAttic.Web.Shared</code> (a folder of the MindAttic.Web monorepo) owns the actual component sources and shared assets (fonts, logos, theme art, the Cyberspace effects). The sites pull them at runtime from jsDelivr; this repo never edits them. It does re-pin the sites' pages, commit those pins, and tag and push MindAttic.Web for the linked group (see <a href="#linked-deploy">Linked deploy</a>), and it invokes the package's splice scripts as <code>preDeploy</code> hooks (for <code>mindattic.com</code>, and for the disabled Prose app).</li>
+<li><strong>Package sources.</strong> <code>MindAttic.Components</code> (its <code>web/</code> folder) owns the actual component sources and shared assets (fonts, logos, theme art, the Cyberspace effects). The sites pull them at runtime from jsDelivr; this repo never edits them. It does re-pin the sites' pages, commit those pins, push them, and tag and push MindAttic.Components for the linked group (see <a href="#linked-deploy">Linked deploy</a>), and it invokes the package's splice scripts as <code>preDeploy</code> hooks (for <code>mindattic.com</code>, and for the disabled Prose app).</li>
 <li><strong>Per-project deploy files.</strong> A <code>scripts/cli/</code>, <code>deploy.ps1</code>, <code>deploy.bat</code> or <code>deploy.settings.json</code> in another repo is not used by anything: delete it rather than maintain it.</li>
 </ul>
 <h2 id="how-the-pipeline-works">How the pipeline works</h2>
@@ -268,15 +268,15 @@ Run: node src/deploy.js [flags]</code></pre>
 </tbody></table>
 <p>Every hook entry can set <code>"required": false</code> to make a failure non-fatal (it logs and continues instead of aborting the whole deploy).</p>
 <h2 id="linked-deploy">Linked deploy</h2>
-<p>The <a href="https://github.com/mindattic/MindAttic.Web">MindAttic.Web</a> monorepo holds the shared jsDelivr asset package (its <code>MindAttic.Web.Shared</code> folder) and the four sites that load their fonts, logos, theme art and Cyberspace engine from it, as sibling folders of one git repo. They are permanently linked. The group is declared in <code>projects.json</code> under <code>linkedGroups</code>:</p>
+<p>The <a href="https://github.com/mindattic/MindAttic.Components">MindAttic.Components</a> repo holds the shared jsDelivr asset package (its <code>web/</code> folder); the four sites that load their fonts, logos, theme art and Cyberspace engine from it live together in the <a href="https://github.com/mindattic/MindAttic.Web">MindAttic.Web</a> repo. They are permanently linked. The group is declared in <code>projects.json</code> under <code>linkedGroups</code>:</p>
 <pre><code class="language-jsonc">"linkedGroups": {
   "mindattic-web": {
-    "package": { "slug": "MindAttic.Web.Shared", "sourceDir": "../MindAttic.Web", "repo": "mindattic/MindAttic.Web",
-                 "cdnSubpath": "MindAttic.Web.Shared", "firstTag": "V12", "branch": "main", "remote": "origin" },
+    "package": { "slug": "MindAttic.Components", "sourceDir": "../MindAttic.Components", "repo": "mindattic/MindAttic.Components",
+                 "cdnSubpath": "web", "firstTag": "V1", "branch": "main", "remote": "origin" },
     "sites":   ["ryandebraal.com", "mindatticcares.com", "hyperspace", "mindattic.com"]   // FTP order
   }
 }</code></pre>
-<p><code>sourceDir</code> is the repo; <code>cdnSubpath</code> is the folder jsDelivr serves as the package, so every asset URL is <code>https://cdn.jsdelivr.net/gh/mindattic/MindAttic.Web@V&lt;n&gt;/MindAttic.Web.Shared/&lt;path&gt;</code>. <code>firstTag</code> is the release tag used while the repo has no whole-number tag yet. Every member site's <code>sourceDir</code> must be inside the repo (<code>../MindAttic.Web/&lt;site&gt;</code>). The tag this flow publishes and pins is the only asset version in the system; there is no global version key in <code>projects.json</code>.</p>
+<p><code>sourceDir</code> is the repo; <code>cdnSubpath</code> is the folder jsDelivr serves as the package, so every asset URL is <code>https://cdn.jsdelivr.net/gh/mindattic/MindAttic.Components@V&lt;n&gt;/web/&lt;path&gt;</code>. <code>firstTag</code> is the release tag used while the repo has no whole-number tag yet. Every member site's <code>sourceDir</code> must be inside the package repo, or all of them inside one other repo (here <code>../MindAttic.Web/&lt;site&gt;</code>: the <strong>split</strong> layout). When split, the release tag is computed from and placed on the package repo's <code>HEAD</code>, the pin commit lands in the sites repo, and both repos are preflighted (clean, on <code>main</code>, not behind <code>origin</code>) and pushed; a hook that changes the package repo aborts the run. The tag this flow publishes and pins is the only asset version in the system; there is no global version key in <code>projects.json</code>.</p>
 <p>Deploying any member (<code>--site ryandebraal.com</code>, <code>--site mindatticcares.com</code>, <code>--site hyperspace</code>, <code>--site mindattic.com</code>, <code>--sites</code>, or <code>--uiux</code>) runs the same flow (<code>src/linked.js</code>). It aborts before any FTP upload if a gate fails:</p>
 <table><thead><tr>
 <th>Step</th>
@@ -286,7 +286,7 @@ Run: node src/deploy.js [flags]</code></pre>
 <tr>
 <td>1</td>
 <td><strong>Preflight</strong></td>
-<td>The repo is on <code>main</code> with a clean working tree, <code>origin</code> reachable, not behind or diverged from <code>origin/main</code>, latest tag is an ancestor of <code>HEAD</code>, no whole-number tag exists only locally unless it is at <code>HEAD</code> (a leftover from a publish whose push failed; skipping past it would leave a gap), no tag moved on origin, <code>MindAttic.Web.Shared\tools\build-asset-manifest.ps1 -Verify</code> passes, every site's page exists inside the repo, FTP secrets resolve.</td>
+<td>The repo is on <code>main</code> with a clean working tree, <code>origin</code> reachable, not behind or diverged from <code>origin/main</code>, latest tag is an ancestor of <code>HEAD</code>, no whole-number tag exists only locally unless it is at <code>HEAD</code> (a leftover from a publish whose push failed; skipping past it would leave a gap), no tag moved on origin, <code>MindAttic.Components\web\tools\build-asset-manifest.ps1 -Verify</code> passes, every site's page exists inside the repo, FTP secrets resolve.</td>
 </tr>
 <tr>
 <td>2</td>
@@ -296,12 +296,12 @@ Run: node src/deploy.js [flags]</code></pre>
 <tr>
 <td>3</td>
 <td><strong>Prepare</strong></td>
-<td>Every <code>MindAttic.Web@V&lt;n&gt;/MindAttic.Web.Shared/</code> pin in each site's <code>pinFiles</code> (default: its <code>stampFile</code>, that is <code>index.htm</code>) becomes the release tag (idempotent; npm, other repos' and non-package URLs are untouched), each site's <code>preDeploy</code> hooks run (a powershell hook with <code>"tagArg": "-CyberspaceCdnTag"</code> receives the tag; <code>package-pull</code> is skipped), and each <code>stampFile</code> gets its Last-Updated stamp.</td>
+<td>Every <code>MindAttic.Components@V&lt;n&gt;/web/</code> pin in each site's <code>pinFiles</code> (default: its <code>stampFile</code>, that is <code>index.htm</code>) becomes the release tag (idempotent; npm, other repos' and non-package URLs are untouched), each site's <code>preDeploy</code> hooks run (a powershell hook with <code>"tagArg": "-Tag"</code> receives the tag; <code>package-pull</code> is skipped), and each <code>stampFile</code> gets its Last-Updated stamp.</td>
 </tr>
 <tr>
 <td>4</td>
 <td><strong>Commit</strong></td>
-<td>Commits the changed site files as <code>Pin MindAttic.Web.Shared V&lt;n&gt;</code>. If a hook changed anything outside the group's site folders the run aborts. Any failure in steps 3-4 restores the working tree (<code>reset --hard</code>, <code>clean -fd</code>) to the clean state preflight verified.</td>
+<td>Commits the changed site files as <code>Pin MindAttic.Components V&lt;n&gt;</code>. If a hook changed anything outside the group's site folders the run aborts. Any failure in steps 3-4 restores the working tree (<code>reset --hard</code>, <code>clean -fd</code>) to the clean state preflight verified.</td>
 </tr>
 <tr>
 <td>5</td>
@@ -316,7 +316,7 @@ Run: node src/deploy.js [flags]</code></pre>
 <tr>
 <td>7</td>
 <td><strong>CDN gate</strong></td>
-<td>Every package URL the pages use must be live on jsDelivr at the release tag: HTTP 200, <code>access-control-allow-origin: *</code>, <code>content-length</code> equal to the file in <code>MindAttic.Web.Shared</code>. Checked: literal URLs plus every file in <code>assets-manifest.json</code> under each site's domain folder (so images a page builds at runtime from a base prefix like <code>ASSET_BASE + 'themes/...'</code> are covered). URLs ending in <code>/</code> are base prefixes and doc placeholders like <code>@&lt;tag&gt;/&lt;path&gt;</code> are ignored. New tags can lag: failures are retried in shared backoff rounds (about 3 minutes).</td>
+<td>Every package URL the pages use must be live on jsDelivr at the release tag: HTTP 200, <code>access-control-allow-origin: *</code>, <code>content-length</code> equal to the file in <code>MindAttic.Components</code>. Checked: literal URLs plus every file in <code>assets-manifest.json</code> under each site's domain folder (so images a page builds at runtime from a base prefix like <code>ASSET_BASE + 'themes/...'</code> are covered). URLs ending in <code>/</code> are base prefixes and doc placeholders like <code>@&lt;tag&gt;/&lt;path&gt;</code> are ignored. New tags can lag: failures are retried in shared backoff rounds (about 3 minutes).</td>
 </tr>
 <tr>
 <td>8</td>
@@ -326,12 +326,12 @@ Run: node src/deploy.js [flags]</code></pre>
 </tbody></table>
 <pre><code class="language-bash">npm run deploy -- --site mindattic.com --dry-run   # read-only plan: [WOULD ABORT] lines show gates that would stop a real run
 npm run deploy -- --site mindattic.com             # the real thing (same as --site ryandebraal.com / --uiux)
-npm run deploy -- --uiux --with-tests              # also run MindAttic.Web.Shared\tests first
+npm run deploy -- --uiux --with-tests              # also run MindAttic.Components\tests first
 npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site only (prints a warning)</code></pre>
 <p>Things to know:</p>
 <ul>
 <li><strong>Commit your work first.</strong> Any uncommitted change in MindAttic.Web aborts the run; the deploy commits only its own pins, splice output and stamps.</li>
-<li><strong>After a deploy the repo is clean and pushed</strong>: the pins and stamps are in the <code>Pin MindAttic.Web.Shared V&lt;n&gt;</code> commit that the tag points at.</li>
+<li><strong>After a deploy the repo is clean and pushed</strong>: the pins and stamps are in the <code>Pin MindAttic.Components V&lt;n&gt;</code> commit that the tag points at.</li>
 <li><strong>Pushing main of MindAttic.Web</strong> can trigger its <code>sync-subscribers</code> GitHub workflow when the push touches the package paths it watches (it opens review PRs; it merges nothing). The pin commit itself touches only site folders.</li>
 <li>The tag is pushed before the CDN gate (the gate needs the tag to exist). If the gate fails the tag stays (immutable) and nothing is uploaded; fix the cause and re-run: <code>HEAD</code> still carries the tag with matching pins, so it is reused.</li>
 <li>If a push is rejected, the run aborts cleanly (nothing uploaded) and the commit and tag stay local; the next run reuses them and pushes.</li>
@@ -357,7 +357,7 @@ npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site onl
 </tr>
 <tr>
 <td><code>npm run deploy -- --uiux</code> (alias <code>--package</code>)</td>
-<td>Publish MindAttic.Web.Shared (pin, commit, tag + push MindAttic.Web), verify the CDN, then deploy every linked site.</td>
+<td>Publish MindAttic.Components (pin, commit, tag + push MindAttic.Web), verify the CDN, then deploy every linked site.</td>
 </tr>
 <tr>
 <td><code>npm run deploy -- --site &lt;slug&gt; --no-link</code></td>
@@ -365,7 +365,7 @@ npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site onl
 </tr>
 <tr>
 <td><code>npm run deploy -- --uiux --with-tests</code></td>
-<td>Linked deploy that also runs <code>MindAttic.Web.Shared/tests</code> (<code>npm run test:local</code>) as a gate before publishing.</td>
+<td>Linked deploy that also runs <code>MindAttic.Components/web/tests</code> (<code>npm run test:local</code>) as a gate before publishing.</td>
 </tr>
 <tr>
 <td><code>npm run deploy -- --app &lt;slug&gt;</code></td>
@@ -413,7 +413,7 @@ npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site onl
 </tr>
 <tr>
 <td><code>MindAttic.Deploy uiux [--dry-run] [--with-tests]</code> (alias <code>package</code>)</td>
-<td>The linked deploy started from the package (<code>--uiux</code>, publishes MindAttic.Web.Shared).</td>
+<td>The linked deploy started from the package (<code>--uiux</code>, publishes MindAttic.Components).</td>
 </tr>
 <tr>
 <td><code>MindAttic.Deploy app --slug &lt;slug&gt; [--dry-run] [--include-disabled]</code></td>
@@ -438,15 +438,15 @@ npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site onl
 <pre><code class="language-bash"># App projects (Cursory, PersonaGallery, MindAttic.Ideas, and the disabled ones):
 cd D:\Projects\MindAttic\MindAttic.Deploy &amp;&amp; npm run deploy -- --app &lt;slug&gt;
 
-# The linked group (MindAttic.Web: MindAttic.Web.Shared, ryandebraal.com, mindatticcares.com, Hyperspace, mindattic.com):
+# The linked group (MindAttic.Components + MindAttic.Web's ryandebraal.com, mindatticcares.com, Hyperspace, mindattic.com):
 # every one of their /deploy shims runs the SAME linked flow (see "Linked deploy" above).
-cd D:\Projects\MindAttic\MindAttic.Deploy &amp;&amp; npm run deploy -- --uiux              # from MindAttic.Web.Shared
+cd D:\Projects\MindAttic\MindAttic.Deploy &amp;&amp; npm run deploy -- --uiux              # from MindAttic.Components
 cd D:\Projects\MindAttic\MindAttic.Deploy &amp;&amp; npm run deploy -- --site &lt;slug&gt;       # from a site (whole group deploys)</code></pre>
 <p>A project that only has a public page has no <code>/deploy</code> here: pushing its README to GitHub publishes the page.</p>
 <h2 id="adding-a-new-deployable-project">Adding a new deployable project</h2>
 <p>A project that only needs a public page needs nothing here: its GitHub README is its page.</p>
 <p>For something that actually ships, pick exactly one array in <code>projects.json</code>. That is the entire procedure: no scaffold script, no per-project files.</p>
-<p><strong>Verbatim root or sub site</strong>: append to <code>sites[]</code> with <code>sourceDir</code> (relative to the repo root), <code>ftpRemotePath</code>, and either <code>files[]</code> (a glob or exact filenames) or <code>uploadDir: true</code> (recursive, non-destructive tree upload). Optional <code>stampFile</code> and <code>preDeploy[]</code>. A site that loads assets from <code>MindAttic.Web.Shared</code> belongs in the linked group: put its folder in MindAttic.Web, add it to <code>linkedGroups.mindattic-web.sites</code> (the listed order is the FTP order) and, if its pinned URLs live outside its <code>stampFile</code>, set <code>pinFiles</code>. Then:</p>
+<p><strong>Verbatim root or sub site</strong>: append to <code>sites[]</code> with <code>sourceDir</code> (relative to the repo root), <code>ftpRemotePath</code>, and either <code>files[]</code> (a glob or exact filenames) or <code>uploadDir: true</code> (recursive, non-destructive tree upload). Optional <code>stampFile</code> and <code>preDeploy[]</code>. A site that loads assets from <code>MindAttic.Components</code> belongs in the linked group: put its folder in MindAttic.Web, add it to <code>linkedGroups.mindattic-web.sites</code> (the listed order is the FTP order) and, if its pinned URLs live outside its <code>stampFile</code>, set <code>pinFiles</code>. Then:</p>
 <pre><code class="language-bash">npm run deploy -- --site &lt;slug&gt;</code></pre>
 <p><strong>Blazor or GitHub-Actions app</strong>: append to <code>apps[]</code> with <code>sourceDir</code>, <code>repo</code> (<code>owner/name</code>), <code>branch</code>, <code>workflow</code> (the <code>.github/workflows/&lt;file&gt;</code> in that repo that does the real deploy), <code>stageOnly[]</code> (paths to <code>git add</code> before committing; an empty array if nothing needs staging), optional <code>commitMessage</code> (supports a <code>{utc}</code> placeholder) and <code>preDeploy[]</code>. New apps should start <code>"disabled": true</code> with a <code>disabledNote</code> describing exactly what infra is missing, per HOUSE-LAW-2 in <code>MindAttic.HouseRules.md</code> (soft-disable, never hard-delete). Then, once enabled:</p>
 <pre><code class="language-bash">npm run deploy -- --app &lt;slug&gt;</code></pre>
@@ -561,7 +561,7 @@ run.bat --version</code></pre>
 </tr>
 <tr>
 <td><strong>Release tag</strong></td>
-<td>The whole-number <code>V&lt;n&gt;</code> tag of MindAttic.Web a linked deploy publishes (or reuses) and pins in the sites (<code>MindAttic.Web@V&lt;n&gt;/MindAttic.Web.Shared/</code>).</td>
+<td>The whole-number <code>V&lt;n&gt;</code> tag of MindAttic.Components a linked deploy publishes (or reuses) and pins in the sites (<code>MindAttic.Components@V&lt;n&gt;/web/</code>).</td>
 </tr>
 <tr>
 <td><strong>CDN gate</strong></td>
@@ -605,9 +605,9 @@ run.bat --version</code></pre>
 </ul>
 <h2 id="license">License</h2>
 <p>This repo has no LICENSE file. All rights reserved.</p>
-<p>Part of <a href="https://mindattic.com">MindAttic</a> — see more projects at <a href="https://github.com/mindattic">github.com/mindattic</a>. Related: <a href="https://github.com/mindattic/MindAttic.Web">MindAttic.Web</a> (MindAttic.Web.Shared, mindattic.com, ryandebraal.com, mindatticcares.com, Hyperspace), <a href="https://github.com/mindattic/IdiotProof">IdiotProof</a>.</p>
+<p>Part of <a href="https://mindattic.com">MindAttic</a> — see more projects at <a href="https://github.com/mindattic">github.com/mindattic</a>. Related: <a href="https://github.com/mindattic/MindAttic.Components">MindAttic.Components</a>, <a href="https://github.com/mindattic/MindAttic.Web">MindAttic.Web</a> (mindattic.com, ryandebraal.com, mindatticcares.com, Hyperspace), <a href="https://github.com/mindattic/IdiotProof">IdiotProof</a>.</p>
 
-    <p class="codex-footer">Generated 2026-10-03 by the shared MindAttic Codex engine (<code>codex-standard/build-readme.ps1</code>) from <code>README.md</code>. Edit the Markdown source, not this file.</p>
+    <p class="codex-footer">Generated 2026-10-13 by the shared MindAttic Codex engine (<code>codex-standard/build-readme.ps1</code>) from <code>README.md</code>. Edit the Markdown source, not this file.</p>
   </main>
 </div>
 <script>(function(){
