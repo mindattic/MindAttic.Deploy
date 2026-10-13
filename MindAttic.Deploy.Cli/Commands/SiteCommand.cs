@@ -25,7 +25,7 @@ public sealed class SiteCommand : Command<SiteCommand.Settings>
         public bool NoLink { get; set; }
 
         [CommandOption("--with-tests")]
-        [Description("Linked deploy: also run MindAttic.Web.Shared/tests as a gate before publishing.")]
+        [Description("Linked deploy: also run MindAttic.Components/web/tests as a gate before publishing.")]
         public bool WithTests { get; set; }
 
         public override Spectre.Console.ValidationResult Validate()

@@ -23,9 +23,9 @@
  *   --site <slug>          : site mode    -- deploy a root site. A member of a linked group
  *                            (projects.json linkedGroups) deploys the WHOLE group -- see src/linked.js
  *   --sites                : site mode    -- deploy every root site (the linked group goes through the linked flow)
- *   --uiux | --package     : linked mode  -- publish MindAttic.Web.Shared (the MindAttic.Web package) and deploy the whole linked group
+ *   --uiux | --package     : linked mode  -- publish MindAttic.Components (the shared jsDelivr web package) and deploy the whole linked group
  *   --no-link              : site mode    -- escape hatch: deploy ONLY the named site, skipping the linked flow
- *   --with-tests           : linked mode  -- also run MindAttic.Web.Shared/tests (npm run test:local) as a gate
+ *   --with-tests           : linked mode  -- also run MindAttic.Components/web/tests (npm run test:local) as a gate
  *   --app <slug>           : app mode     -- deploy a single Blazor app (via GitHub Actions)
  *   --apps                 : app mode     -- deploy every ENABLED app (use --include-disabled to surface stubs)
  *   --include-disabled     : app mode     -- include `disabled: true` apps in --apps iteration
@@ -63,9 +63,9 @@ Flags (also accept --flag=value form):
   --site <slug>        site mode:    deploy a root site (a linked-group member deploys the WHOLE group:
                        pin + commit + tag + push MindAttic.Web, CDN gate, then FTP for every site in the group)
   --sites              site mode:    deploy every root site (linked group first, via the linked flow)
-  --uiux | --package   linked mode:  publish MindAttic.Web.Shared and deploy the whole linked group
+  --uiux | --package   linked mode:  publish MindAttic.Components and deploy the whole linked group
   --no-link            site mode:    ESCAPE HATCH -- deploy only the named site (loud warning)
-  --with-tests         linked mode:  also run MindAttic.Web.Shared/tests as a gate before publishing
+  --with-tests         linked mode:  also run MindAttic.Components/web/tests as a gate before publishing
   --app <slug>         app mode:     deploy a single Blazor app via GitHub Actions
   --apps               app mode:     deploy every enabled app
   --include-disabled   app mode:     include disabled apps in --apps iteration
@@ -286,7 +286,7 @@ function runDotnetBuildHook(project, configuration) {
 // opts (linked deploy only): { tag, skipPackagePull }.
 //   - skipPackagePull: the linked flow already verified the repo (clean, on main, not behind origin), so
 //     the `git pull` hook is redundant there.
-//   - tag: appended to a powershell hook that declares `tagArg` (e.g. "-CyberspaceCdnTag") so the sync
+//   - tag: appended to a powershell hook that declares `tagArg` (e.g. "-Tag") so the sync
 //     script splices the SAME package tag the linked flow pins and publishes.
 async function executePreDeploy(profile, opts = {}) {
     for (const hook of profile.preDeploy || []) {
@@ -557,7 +557,7 @@ async function runSiteMode(config, targetsOverride) {
     if (totalFailed > 0 || siteErrors.length > 0) process.exit(1);
 }
 
-// Linked group (MindAttic.Web: MindAttic.Web.Shared + ryandebraal.com + mindatticcares.com + Hyperspace + mindattic.com): see src/linked.js.
+// Linked group (MindAttic.Components + MindAttic.Web's ryandebraal.com + mindatticcares.com + Hyperspace + mindattic.com): see src/linked.js.
 async function runLinkedMode(config, plan) {
     const linked = require('./linked');
     const result = await linked.runLinked(

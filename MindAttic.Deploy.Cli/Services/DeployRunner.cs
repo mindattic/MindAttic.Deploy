@@ -26,7 +26,7 @@ public sealed class DeployRunner
         return RunNode(args);
     }
 
-    /// <summary>Publish MindAttic.Web.Shared and deploy the whole linked group (same as deploying any member site).</summary>
+    /// <summary>Publish MindAttic.Components and deploy the whole linked group (same as deploying any member site).</summary>
     public int RunUiux(bool dryRun, bool withTests)
     {
         var args = new List<string> { "src/deploy.js", "--uiux" };

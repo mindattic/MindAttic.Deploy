@@ -5,7 +5,7 @@ using Spectre.Console.Cli;
 namespace MindAttic.Deploy.Cli.Commands;
 
 /// <summary>
-/// `MindAttic.Deploy uiux` -- publish MindAttic.Web.Shared (pin, commit, tag + push the MindAttic.Web monorepo) and deploy
+/// `MindAttic.Deploy uiux` -- publish MindAttic.Components (tag + push MindAttic.Components; pin, commit + push the sites in MindAttic.Web) and deploy
 /// the whole linked group (ryandebraal.com, mindatticcares.com, hyperspace, mindattic.com). Identical to deploying any
 /// member site; shells into
 /// `node src/deploy.js --uiux`. See src/linked.js.
@@ -19,7 +19,7 @@ public sealed class UiuxCommand : Command<UiuxCommand.Settings>
         public bool DryRun { get; set; }
 
         [CommandOption("--with-tests")]
-        [Description("Also run MindAttic.Web.Shared/tests (npm run test:local) as a gate before publishing.")]
+        [Description("Also run MindAttic.Components/web/tests (npm run test:local) as a gate before publishing.")]
         public bool WithTests { get; set; }
     }
 

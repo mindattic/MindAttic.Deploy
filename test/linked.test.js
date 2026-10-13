@@ -285,7 +285,7 @@ test('cli: unknown flags still exit 2; --help documents the new flags', () => {
     assert.match(r.stderr, /unknown flag --bogus/);
     r = spawnSync(node, [script, '--help'], { encoding: 'utf8' });
     assert.equal(r.status, 0);
-    for (const f of ['--uiux', '--package', '--no-link', '--with-tests', 'MindAttic.Web.Shared']) assert.ok(r.stdout.includes(f), `help mentions ${f}`);
+    for (const f of ['--uiux', '--package', '--no-link', '--with-tests', 'MindAttic.Components']) assert.ok(r.stdout.includes(f), `help mentions ${f}`);
 });
 
 // --- pins / urls ------------------------------------------------------------
@@ -780,14 +780,14 @@ test('cli: a bare run, --dry-run alone and unknown flags exit 2; the registry ho
     for (const f of ['src/build.js', 'src/parts.js', 'template']) assert.ok(!fs.existsSync(path.join(__dirname, '..', f)), `${f} is gone`);
 });
 
-test('registry: the linked group is the MindAttic.Web monorepo and only ships what the pages need', () => {
+test('registry: the linked group is the MindAttic.Components package + the MindAttic.Web sites, and only ships what the pages need', () => {
     const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'projects.json'), 'utf8'));
     const g = cfg.linkedGroups['mindattic-web'];
     assert.ok(g && g.package, 'group has a package');
-    assert.equal(g.package.repo, 'mindattic/MindAttic.Web');
-    assert.equal(g.package.sourceDir, '../MindAttic.Web');
-    assert.equal(g.package.cdnSubpath, 'MindAttic.Web.Shared');
-    assert.equal(g.package.firstTag, 'V12');
+    assert.equal(g.package.repo, 'mindattic/MindAttic.Components');
+    assert.equal(g.package.sourceDir, '../MindAttic.Components');
+    assert.equal(g.package.cdnSubpath, 'web');
+    assert.equal(g.package.firstTag, 'V1');
     assert.equal(g.package.tagPrefix, undefined, 'no dead tagPrefix (whole-number V tags are hard-coded by law)');
     assert.deepEqual(g.sites, ['ryandebraal.com', 'mindatticcares.com', 'hyperspace', 'mindattic.com']);
     const bySlug = new Map(cfg.sites.map((s) => [s.slug, s]));
@@ -801,8 +801,138 @@ test('registry: the linked group is the MindAttic.Web monorepo and only ships wh
     assert.equal(bySlug.get('hyperspace').ftpRemotePath, '/mindattic.com/hyperspace');
     const mc = bySlug.get('mindattic.com');
     assert.ok(!mc.preDeploy.some((h) => (h.file || '').includes('fetch-descriptions')), 'mindattic.com has no fetch-descriptions hook');
-    assert.ok(mc.preDeploy.some((h) => h.tagArg === '-CyberspaceCdnTag' && h.file.startsWith('../MindAttic.Web/MindAttic.Web.Shared/')), 'the Cyberspace splice receives the release tag');
+    for (const slug of g.sites) {
+        const hooks = bySlug.get(slug).preDeploy || [];
+        assert.ok(hooks.some((h) => h.tagArg === '-Tag' && h.file === '../MindAttic.Components/web/build/build-sites.ps1'), `${slug}: the Components build receives the release tag`);
+    }
     const kinds = [...cfg.sites, ...cfg.apps].flatMap((p) => (p.preDeploy || []).map((h) => h.kind));
     assert.ok(!kinds.includes('uiux-pull'), 'hook kind is package-pull');
     assert.ok(!JSON.stringify(cfg).includes('MindAttic.UiUx'), 'no MindAttic.UiUx references left in the registry');
+});
+
+// --- split layout: the package is its own repo; the sites share another -------
+
+/**
+ * A package repo `pkg/` (Shared/ = the CDN subpath) with its own origin, and a separate sites repo `sites/`
+ * (a.test, b.test, c.test) with its own origin -- like MindAttic.Components + the MindAttic.Web sites. The
+ * sites repo carries an unrelated V16 tag, so a release tag taken from the wrong repo would show.
+ */
+function makeSplitWorld({ tag = 'V1' } = {}) {
+    const root = fs.mkdtempSync(path.join(SCRATCH, 'linked-split-'));
+    const origin = path.join(root, 'pkg-origin.git');
+    const sitesOrigin = path.join(root, 'sites-origin.git');
+    const repo = path.join(root, 'pkg');
+    const sitesRepo = path.join(root, 'sites');
+    for (const o of [origin, sitesOrigin]) { fs.mkdirSync(o); spawnSync('git', ['init', '--bare', '-b', 'main', o]); }
+    for (const r of [repo, sitesRepo]) { fs.mkdirSync(r); spawnSync('git', ['init', '-b', 'main', r]); }
+    const shared = path.join(repo, SUB);
+    write(path.join(shared, 'fonts', 'f.woff2'), 'wOF2-font-bytes-0123456789');
+    for (const slug of MEMBERS) {
+        write(path.join(shared, slug, 'logos', 'logo.png'), `png-${slug}-` + 'x'.repeat(40));
+        write(path.join(shared, slug, 'themes', 'x', 'x-01.jpg'), `jpg-${slug}-` + 'y'.repeat(70));
+    }
+    writeManifest(shared);
+    git(repo, 'add', '-A'); git(repo, 'commit', '-m', 'package');
+    git(repo, 'remote', 'add', 'origin', origin); git(repo, 'push', 'origin', 'main');
+    if (tag) { git(repo, 'tag', '-a', tag, '-m', tag); git(repo, 'push', 'origin', tag); }
+
+    const sites = [];
+    for (const slug of MEMBERS) {
+        const rel = `sites/${slug}`;
+        write(path.join(root, rel, 'index.htm'), siteHtml(slug, tag || 'V1'));
+        const site = { slug, sourceDir: rel, files: ['index.htm'], stampFile: 'index.htm', ftpRemotePath: '/' + slug };
+        if (slug === 'c.test') site.preDeploy = [{ kind: 'powershell', file: 'build.ps1', tagArg: '-Tag' }];
+        sites.push(site);
+    }
+    git(sitesRepo, 'add', '-A'); git(sitesRepo, 'commit', '-m', 'sites');
+    git(sitesRepo, 'remote', 'add', 'origin', sitesOrigin); git(sitesRepo, 'push', 'origin', 'main');
+    git(sitesRepo, 'tag', '-a', 'V16', '-m', 'old monorepo tag'); git(sitesRepo, 'push', 'origin', 'V16');
+
+    const pkg = { slug: PKG_SLUG, sourceDir: 'pkg', repo: REPO, cdnSubpath: SUB };
+    const config = { linkedGroups: { grp: { package: pkg, sites: [...MEMBERS] } }, sites };
+    const siteFile = (slug) => path.join(root, 'sites', slug, 'index.htm');
+    return { root, origin, repo, shared, config, siteFile, sitesRepo, sitesOrigin };
+}
+
+/** Put the split package ahead of its latest tag (and push it, so only the tag is unpublished). */
+function advancePackage(w) {
+    addCommit(w);
+    git(w.repo, 'push', 'origin', 'main');
+}
+
+test('split repos: tag from the PACKAGE repo, pin commit in the SITES repo, tag on the package HEAD, both pushed', async () => {
+    const w = makeSplitWorld();
+    advancePackage(w);                              // package ahead of V1 -> release V2 (not V17 from the sites repo)
+    const pkgHead = git(w.repo, 'rev-parse', 'HEAD');
+    const cdn = await startCdn(w);
+    try {
+        const { deps, calls, text } = makeDeps(w, cdn);
+        const r = await run(w, deps);
+        assert.ok(r.ok, text());
+        assert.equal(r.tag, 'V2');
+        assert.equal(r.reused, false);
+        // the pin commit lives in the sites repo; the package repo got no commit
+        assert.equal(git(w.sitesRepo, 'log', '-1', '--pretty=%s'), `Pin ${PKG_SLUG} V2`);
+        assert.equal(git(w.repo, 'rev-parse', 'HEAD'), pkgHead, 'no commit in the package repo');
+        // the tag is on the package repo at its HEAD and pushed; the sites repo has no V2
+        assert.equal(git(w.repo, 'rev-parse', 'V2^{commit}'), pkgHead);
+        assert.ok(git(w.origin, 'tag', '--list').split('\n').includes('V2'));
+        assert.ok(!git(w.sitesRepo, 'tag', '--list').split('\n').includes('V2'));
+        // the sites repo's pin commit was pushed
+        assert.equal(git(w.sitesOrigin, 'rev-parse', 'main'), git(w.sitesRepo, 'rev-parse', 'HEAD'));
+        for (const slug of MEMBERS) assert.ok(fs.readFileSync(w.siteFile(slug), 'utf8').includes(`${PIN('V2')}/fonts/f.woff2`), `${slug} pinned to V2`);
+        // the hook received the release tag; FTP in group order
+        assert.deepEqual(calls.hooks.map((h) => [h.slug, h.opts.tag]), [['c.test', 'V2']]);
+        assert.deepEqual(calls.deploy.map((d) => d.slug), MEMBERS);
+        assert.equal(git(w.sitesRepo, 'status', '--porcelain'), '');
+        assert.equal(git(w.repo, 'status', '--porcelain'), '');
+    } finally { await cdn.close(); }
+});
+
+test('split repos: re-running reuses the package tag -- no commit in either repo, no new tag, still deploys', async () => {
+    const w = makeSplitWorld();
+    advancePackage(w);
+    const cdn = await startCdn(w);
+    try {
+        await run(w, makeDeps(w, cdn).deps);
+        const before = { pkg: git(w.repo, 'rev-parse', 'HEAD'), sites: git(w.sitesRepo, 'rev-parse', 'HEAD'), tags: git(w.repo, 'tag', '--list') };
+        const { deps, calls, text } = makeDeps(w, cdn);
+        const r = await run(w, deps);
+        assert.ok(r.ok, text());
+        assert.equal(r.tag, 'V2');
+        assert.equal(r.reused, true);
+        assert.equal(git(w.repo, 'rev-parse', 'HEAD'), before.pkg);
+        assert.equal(git(w.sitesRepo, 'rev-parse', 'HEAD'), before.sites);
+        assert.equal(git(w.repo, 'tag', '--list'), before.tags);
+        assert.equal(calls.hooks.length, 0, 'no hooks on a reuse');
+        assert.deepEqual(calls.deploy.map((d) => d.slug), MEMBERS);
+    } finally { await cdn.close(); }
+});
+
+test('split repos: a dirty SITES repo aborts in preflight; nothing is pinned, committed, tagged, pushed, or uploaded', async () => {
+    const w = makeSplitWorld();
+    advancePackage(w);
+    write(path.join(w.sitesRepo, 'a.test', 'scratch.txt'), 'uncommitted');
+    const before = { pkg: git(w.repo, 'rev-parse', 'HEAD'), sites: git(w.sitesRepo, 'rev-parse', 'HEAD'), tags: git(w.repo, 'tag', '--list'), pages: snapshotSites(w) };
+    const { deps, calls, text } = makeDeps(w, null);
+    const r = await run(w, deps);
+    assert.equal(r.aborted, true, text());
+    assert.match(text(), /sites repo .* has 1 uncommitted change/);
+    assert.equal(git(w.repo, 'rev-parse', 'HEAD'), before.pkg);
+    assert.equal(git(w.sitesRepo, 'rev-parse', 'HEAD'), before.sites);
+    assert.equal(git(w.repo, 'tag', '--list'), before.tags);
+    assert.deepEqual(snapshotSites(w), before.pages);
+    assert.equal(calls.deploy.length, 0);
+    assert.equal(calls.accessed, 0);
+});
+
+test('split repos: a hook that edits the PACKAGE repo aborts (the tag must be the package as committed)', async () => {
+    const w = makeSplitWorld();
+    advancePackage(w);
+    const { deps, calls, text } = makeDeps(w, null, { hook: () => write(path.join(w.shared, 'a.test', 'stray.txt'), 'x') });
+    const r = await run(w, deps);
+    assert.equal(r.aborted, true, text());
+    assert.match(text(), /changed 1 file\(s\) in the package repo/);
+    assert.ok(!git(w.repo, 'tag', '--list').split('\n').includes('V2'), 'no tag');
+    assert.equal(calls.deploy.length, 0);
 });

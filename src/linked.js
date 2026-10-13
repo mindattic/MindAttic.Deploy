@@ -1,9 +1,11 @@
 /**
  * linked.js -- linked-group deploy.
  *
- * The MindAttic.Web monorepo holds the shared jsDelivr asset package (the MindAttic.Web.Shared folder, the
- * group's `package.cdnSubpath`) AND the sites that consume it (ryandebraal.com, mindatticcares.com, Hyperspace,
- * mindattic.com) as sibling folders of ONE git repo. They are PERMANENTLY linked: deploying any one of them
+ * A linked group is a shared jsDelivr asset package (the `package.cdnSubpath` folder of its repo) AND the sites
+ * that consume it (ryandebraal.com, mindatticcares.com, Hyperspace, mindattic.com). The sites either live in the
+ * package's own repo or all together in ONE other repo (today: package MindAttic.Components `web/`, sites in
+ * MindAttic.Web). In that split layout the tag comes from and goes on the package repo, the pin commit lands
+ * in the sites repo, and both repos are preflighted and pushed. They are PERMANENTLY linked: deploying any one of them
  * deploys all of them, in this order:
  *
  *   1. preflight   repo clean, on main, not behind origin, tags sane, manifest current,
@@ -350,6 +352,50 @@ function inspectRepo({ repoDir, branch = 'main', remote = 'origin', fetch = fals
     return { problems, info };
 }
 
+/** The git work tree that contains `dir`, or null. */
+function repoTopLevel(dir) {
+    if (!fs.existsSync(dir)) return null;
+    const r = git(dir, ['rev-parse', '--show-toplevel'], { allowFail: true });
+    return r.status === 0 && r.stdout ? path.resolve(r.stdout) : null;
+}
+
+/**
+ * Preflight for the SITES repo when it is not the package repo (split layout): it must be a clean work
+ * tree on `branch`, not behind `remote`. Tags are the package repo's business, so none are inspected here.
+ * Returns { problems, info: { repoDir, head, currentBranch, remoteMain, ahead } }.
+ */
+function inspectSitesRepo({ repoDir, branch = 'main', remote = 'origin', fetch = false }) {
+    const problems = [];
+    const info = { repoDir, branch, remote, ahead: 0 };
+    info.head = git(repoDir, ['rev-parse', 'HEAD']).stdout;
+    info.currentBranch = git(repoDir, ['rev-parse', '--abbrev-ref', 'HEAD']).stdout;
+    if (info.currentBranch !== branch) {
+        problems.push(`sites repo ${repoDir} is on '${info.currentBranch}', not '${branch}' -- switch to ${branch} before a linked deploy.`);
+    }
+    const dirty = git(repoDir, ['status', '--porcelain'], { raw: true }).stdout;
+    info.dirty = dirty ? dirty.split('\n') : [];
+    if (info.dirty.length) {
+        const shown = info.dirty.slice(0, 15).join('\n    ');
+        problems.push(`sites repo ${repoDir} has ${info.dirty.length} uncommitted change(s) (deploy commits only its own pin/stamp changes -- commit or discard these first):\n    ${shown}${info.dirty.length > 15 ? `\n    ...and ${info.dirty.length - 15} more` : ''}`);
+    }
+    if (fetch) git(repoDir, ['fetch', remote], { allowFail: true });
+    const rm = git(repoDir, ['ls-remote', remote, `refs/heads/${branch}`], { allowFail: true });
+    if (rm.status !== 0) {
+        problems.push(`sites repo ${repoDir}: cannot reach '${remote}' (git ls-remote failed).`);
+        return { problems, info };
+    }
+    info.remoteMain = rm.stdout ? rm.stdout.split(/\s+/)[0] : null;
+    if (info.remoteMain && info.remoteMain !== info.head) {
+        const haveObj = git(repoDir, ['cat-file', '-e', `${info.remoteMain}^{commit}`], { allowFail: true }).status === 0;
+        const isAncestor = haveObj && git(repoDir, ['merge-base', '--is-ancestor', info.remoteMain, 'HEAD'], { allowFail: true }).status === 0;
+        if (!isAncestor) problems.push(`sites repo ${repoDir}: local ${branch} is BEHIND or has DIVERGED from ${remote}/${branch} (${info.remoteMain.slice(0, 8)}${haveObj ? '' : ', not present locally'}) -- pull/merge first.`);
+        else info.ahead = parseInt(git(repoDir, ['rev-list', '--count', `${info.remoteMain}..HEAD`]).stdout, 10);
+    } else if (!info.remoteMain) {
+        info.ahead = parseInt(git(repoDir, ['rev-list', '--count', 'HEAD']).stdout, 10);
+    }
+    return { problems, info };
+}
+
 function runManifestVerify(pkgRoot) {
     const script = path.join(pkgRoot, 'tools', 'build-asset-manifest.ps1');
     if (!fs.existsSync(script)) return { skipped: true, ok: true };
@@ -359,8 +405,10 @@ function runManifestVerify(pkgRoot) {
 }
 
 function runPackageTests(pkgRoot) {
-    const dir = path.join(pkgRoot, 'tests');
-    if (!fs.existsSync(path.join(dir, 'package.json'))) return { skipped: true, ok: true };
+    // The package's Playwright suite: tests/package/ (MindAttic.Components web/) or tests/ (the old layout).
+    const dir = [path.join(pkgRoot, 'tests', 'package'), path.join(pkgRoot, 'tests')]
+        .find((d) => fs.existsSync(path.join(d, 'package.json')));
+    if (!dir) return { skipped: true, ok: true };
     // A fixed command string (no args array): npm is npm.cmd on Windows so a shell is needed, and passing
     // an args array together with `shell: true` is deprecated in Node (DEP0190) because args are not escaped.
     const r = child_process.spawnSync('npm run test:local', { cwd: dir, shell: true, encoding: 'utf8', stdio: 'inherit' });
@@ -598,13 +646,37 @@ async function runLinked(opts, deps) {
             else gateFail(`package tests failed (${t.message})`);
         }
 
+        // The sites' repo: the package repo itself (the original monorepo layout), or one other repo that
+        // every site of the group shares (split layout: the package is its own repo).
+        const pkgTop = repoTopLevel(repoDir) || path.resolve(repoDir);
+        let sitesRepo = null;
+        for (const site of plan.sites) {
+            const top = repoTopLevel(path.resolve(repoRoot, site.sourceDir));
+            if (!top) continue;
+            if (!sitesRepo) sitesRepo = top;
+            else if (top !== sitesRepo) gateFail(`site '${site.slug}' is in ${top}, but the group's other sites are in ${sitesRepo} -- every site of a linked group must share one repo.`);
+        }
+        const split = !!sitesRepo && sitesRepo !== pkgTop;
+        if (!sitesRepo) sitesRepo = repoDir;
+        if (split) sitesRepo = path.resolve(sitesRepo);
+        const sitesWork = split ? sitesRepo : repoDir;   // where pins are committed (== repoDir in the old layout)
+        let sitesInfo = null;
+        if (split) {
+            log(`  sites repo: ${sitesRepo}  (the package is its own repo)\n`);
+            const sr = inspectSitesRepo({ repoDir: sitesRepo, branch: group.sitesBranch || 'main', remote: group.sitesRemote || 'origin', fetch: !dryRun });
+            for (const p of sr.problems) gateFail(p);
+            sitesInfo = sr.info;
+        }
+
         const siteDirs = [];
         for (const site of plan.sites) {
             const { dir, files } = siteHtmlFiles(site, repoRoot, deps.expandFiles);
             if (!fs.existsSync(dir)) { gateFail(`site '${site.slug}': sourceDir not found: ${dir}`); continue; }
             if (files.length === 0) gateFail(`site '${site.slug}': no .htm/.html files matched ${JSON.stringify(site.files)} in ${dir}`);
-            const rel = siteRelDir(repoDir, dir);
-            if (rel === null) gateFail(`site '${site.slug}': ${dir} is not inside the package repo ${repoDir} -- a linked site must live in the same repo.`);
+            const rel = siteRelDir(sitesWork, dir);
+            if (rel === null) gateFail(split
+                ? `site '${site.slug}': ${dir} is not inside the sites repo ${sitesWork}.`
+                : `site '${site.slug}': ${dir} is not inside the package repo ${repoDir} -- a linked site must live in the same repo (or every site in one other repo).`);
             else siteDirs.push(rel);
         }
 
@@ -689,35 +761,40 @@ async function runLinked(opts, deps) {
                         const when = deps.stamp(abs);
                         log(`  [stamp] ${site.slug}/${site.stampFile} <- ${when}\n`);
                     }
-                    const changed = porcelainPaths(repoDir);
+                    const changed = porcelainPaths(sitesWork);
                     const outside = changed.filter((p) => !siteDirs.some((d) => p === d || p.startsWith(d + '/')));
                     if (outside.length) {
                         throw new LinkedAbort(`a preDeploy hook changed ${outside.length} file(s) outside the group's site folders (${siteDirs.join(', ')}); refusing to commit them:\n    ${outside.slice(0, 15).join('\n    ')}`);
                     }
+                    if (split) {
+                        const pkgChanged = porcelainPaths(repoDir);
+                        if (pkgChanged.length) throw new LinkedAbort(`a preDeploy hook changed ${pkgChanged.length} file(s) in the package repo ${repoDir}; the release tag must be the package exactly as committed:\n    ${pkgChanged.slice(0, 15).join('\n    ')}`);
+                    }
 
-                    log(`\n[4/8] commit\n`);
+                    log(`\n[4/8] commit${split ? `  (in the sites repo ${sitesWork})` : ''}\n`);
                     if (changed.length === 0) {
-                        log(`  [git]  nothing changed; tagging HEAD as is\n`);
+                        log(`  [git]  nothing changed; ${split ? 'no pin commit needed' : 'tagging HEAD as is'}\n`);
                     } else {
-                        git(repoDir, ['add', '-A', '--', ...siteDirs]);
+                        git(sitesWork, ['add', '-A', '--', ...siteDirs]);
                         const msg = `Pin ${pkg.slug} ${tag}`;
-                        const c = git(repoDir, ['commit', '-m', msg], { allowFail: true });
+                        const c = git(sitesWork, ['commit', '-m', msg], { allowFail: true });
                         if (c.status !== 0) throw new LinkedAbort(`git commit failed: ${c.stderr || c.stdout}`);
                         log(`  [git]  commit "${msg}"  (${changed.length} file(s))\n`);
                     }
                 } catch (e) {
                     log(`  [git]  restoring the working tree (reset --hard HEAD, clean -fd)\n`);
-                    git(repoDir, ['reset', '--hard', 'HEAD'], { allowFail: true });
-                    git(repoDir, ['clean', '-fd'], { allowFail: true });
+                    git(sitesWork, ['reset', '--hard', 'HEAD'], { allowFail: true });
+                    git(sitesWork, ['clean', '-fd'], { allowFail: true });
                     throw e;
                 }
-                result.commit = git(repoDir, ['rev-parse', 'HEAD']).stdout;
+                result.commit = git(sitesWork, ['rev-parse', 'HEAD']).stdout;
 
-                log(`\n[5/8] tag\n`);
+                log(`\n[5/8] tag${split ? `  (the package repo ${repoDir})` : ''}\n`);
+                const pkgHead = git(repoDir, ['rev-parse', 'HEAD']).stdout;
                 const tmsg = buildTagMessage(repoDir, tag, info.latest);
                 const t = git(repoDir, ['tag', '-a', tag, '-m', tmsg], { allowFail: true });
                 if (t.status !== 0) throw new LinkedAbort(`git tag -a ${tag} failed: ${t.stderr || t.stdout}\n        The pin commit ${result.commit.slice(0, 8)} is local only.`);
-                log(`  [git]  tag -a ${tag} -> ${result.commit.slice(0, 8)}\n`);
+                log(`  [git]  tag -a ${tag} -> ${pkgHead.slice(0, 8)}\n`);
             }
         }
 
@@ -742,6 +819,21 @@ async function runLinked(opts, deps) {
                 if (p.status !== 0) throw new LinkedAbort(`git push ${remote} ${tag} was rejected: ${p.stderr}\n        The next run reuses the local tag and pushes again.`);
             } else {
                 log(`  [git]  ${tag} already on ${remote} at HEAD; nothing to push\n`);
+            }
+        }
+        if (split) {
+            const sBranch = group.sitesBranch || 'main';
+            const sRemote = group.sitesRemote || 'origin';
+            const sHead = dryRun ? sitesInfo.head : git(sitesWork, ['rev-parse', 'HEAD']).stdout;
+            const sitesNeedPush = !dryRun ? sHead !== sitesInfo.remoteMain : (!reuse || sitesInfo.ahead > 0);
+            if (dryRun) {
+                log(`  [git]  (dry-run) sites repo: ${sitesNeedPush ? `would push ${sRemote} ${sBranch}` : `${sBranch} already on ${sRemote}`}\n`);
+            } else if (sitesNeedPush) {
+                log(`  [git]  sites repo: push ${sRemote} ${sBranch}\n`);
+                const p = git(sitesWork, ['push', sRemote, sBranch], { allowFail: true });
+                if (p.status !== 0) throw new LinkedAbort(`sites repo: git push ${sRemote} ${sBranch} was rejected: ${p.stderr}\n        The pin commit exists locally only; the next run pushes it again.`);
+            } else {
+                log(`  [git]  sites repo: ${sBranch} already on ${sRemote}; nothing to push\n`);
             }
         }
 
@@ -846,6 +938,16 @@ async function runLinked(opts, deps) {
                 if (dirty.length) notes.push(`${dirty.length} uncommitted change(s)`);
                 if (remoteMain !== localHead) notes.push(`${branch} differs from ${remote}/${branch}`);
                 log(`  [note] ${pkg.repo}: ${notes.join(', ')} after the deploy\n`);
+            }
+            if (split) {
+                const sBranch = group.sitesBranch || 'main';
+                const sRemote = group.sitesRemote || 'origin';
+                const sDirty = porcelainPaths(sitesWork);
+                const srm = git(sitesWork, ['ls-remote', sRemote, `refs/heads/${sBranch}`], { allowFail: true });
+                const sRemoteMain = srm.status === 0 && srm.stdout ? srm.stdout.split(/\s+/)[0] : null;
+                const sHead = git(sitesWork, ['rev-parse', 'HEAD']).stdout;
+                if (sDirty.length === 0 && sRemoteMain === sHead) log(`  [ok]   sites repo: working tree clean, ${sBranch} in sync with ${sRemote} at ${sHead.slice(0, 8)}\n`);
+                else log(`  [note] sites repo: ${[sDirty.length ? `${sDirty.length} uncommitted change(s)` : null, sRemoteMain !== sHead ? `${sBranch} differs from ${sRemote}/${sBranch}` : null].filter(Boolean).join(', ')} after the deploy\n`);
             }
         }
         const bad = result.sites.filter((s) => s.error || s.failed);

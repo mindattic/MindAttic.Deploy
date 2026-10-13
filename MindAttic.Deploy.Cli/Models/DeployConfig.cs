@@ -32,13 +32,13 @@ public sealed class HookProfile
     [JsonPropertyName("configuration")] public string? Configuration { get; set; }
     [JsonPropertyName("args")]          public List<string> Args      { get; set; } = new();
     [JsonPropertyName("required")]      public bool?   Required      { get; set; }
-    /// <summary>Linked deploy: the powershell flag that receives the release tag (e.g. -CyberspaceCdnTag).</summary>
+    /// <summary>Linked deploy: the powershell flag that receives the release tag (e.g. -Tag).</summary>
     [JsonPropertyName("tagArg")]        public string? TagArg        { get; set; }
 }
 
 /// <summary>
-/// A permanently linked set: one monorepo (MindAttic.Web) whose package folder (cdnSubpath, MindAttic.Web.Shared) is served over jsDelivr, plus the sites that
-/// consume it. Deploying ANY member deploys the whole group (see src/linked.js).
+/// A permanently linked set: a package repo (MindAttic.Components) whose package folder (cdnSubpath, web) is served over jsDelivr, plus the sites that
+/// consume it (in the package repo, or all in one other repo such as MindAttic.Web). Deploying ANY member deploys the whole group (see src/linked.js).
 /// </summary>
 public sealed class LinkedGroup
 {
@@ -55,7 +55,7 @@ public sealed class LinkedPackage
     [JsonPropertyName("remote")]    public string Remote    { get; set; } = "origin";
     /// <summary>Folder inside the repo that jsDelivr serves as the package: gh/&lt;repo&gt;@V&lt;n&gt;/&lt;cdnSubpath&gt;/...</summary>
     [JsonPropertyName("cdnSubpath")] public string? CdnSubpath { get; set; }
-    /// <summary>The first release tag when the repo has no whole-number tag yet (e.g. V12).</summary>
+    /// <summary>The first release tag when the repo has no whole-number tag yet (e.g. V1).</summary>
     [JsonPropertyName("firstTag")]  public string? FirstTag   { get; set; }
 }
 
