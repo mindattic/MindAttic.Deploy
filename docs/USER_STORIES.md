@@ -22,7 +22,7 @@ updated: 2026-10-03
 
 ## Epic C — Root sites (verbatim upload) and the linked group
 - **DEP-US-C1 🟡** As the operator, I can upload a root site's files verbatim (not templated) to its FTP path with a Last-Updated stamp. *Given a `sites[]` entry, When I run `--site <slug>`, Then preDeploy hooks run, `stampFile` is stamped, and the `files[]` glob is FTPS-uploaded.* *(implemented: `runSiteMode`/`deployOneSite`/`stampIndex`; requires live FTP — no automated test of the plain mode.)*
-- **DEP-US-C2 🟡** As the operator, `mindattic.com` re-splices its Cyberspace markers at the release tag before upload. *Given mindattic.com's `preDeploy[]`, When I deploy it, Then `package-pull` (skipped inside the linked flow) and `MindAttic.Web.Shared/sync/sync-mindattic-com.ps1` (receiving the tag via `-CyberspaceCdnTag`) run before the pin commit.* *(implemented via `executePreDeploy`; the hook wiring is checked by the `registry:` test in `test/linked.test.js`; the hook run itself has no automated test.)*
+- **DEP-US-C2 🟡** As the operator, `mindattic.com` re-splices its MindAttic.Components blocks before upload. *Given mindattic.com's `preDeploy[]`, When I deploy it, Then `package-pull` (skipped inside the linked flow) and `MindAttic.Components/web/build/build-sites.ps1 -Site mindattic.com` (pinning the Components tag from `web/sites.json`) run before the pin commit.* *(implemented via `executePreDeploy`; the hook wiring is checked by the `registry:` test in `test/linked.test.js`; the hook run itself has no automated test.)*
 - **DEP-US-C3 🟡** As the operator, deploying any of MindAttic.Web.Shared, ryandebraal.com, mindatticcares.com, Hyperspace or mindattic.com deploys them all from the one MindAttic.Web repo: the next tag is pinned in the pages, hooks and stamps run, a `Pin MindAttic.Web.Shared V<n>` commit is tagged and pushed (or an already-tagged `HEAD` is reused), every asset is verified byte-exact on jsDelivr, then the sites upload — nothing uploads if a gate fails, and the repo is clean and pushed afterwards. *(implemented in `src/linked.js`; covered by `test/linked.test.js` against fixtures; real runs succeed but there is no automated test against the real CDN/host.)*
 
 ## Epic D — Blazor / GitHub-Actions apps
@@ -40,3 +40,13 @@ Dependency-ordered toward the headline goal (every status above provable):
 2. **DEP-US-F2 ⬜** Add unit coverage for `expandFiles` glob escaping and `stampIndex` idempotency (pure functions, no network).
 3. **DEP-US-E2 ⬜** MindAttic.Vault credential resolution in the Node front door; drop `secrets/ftp.json`.
 4. **DEP-US-F3 ⬜** Smoke-deploy step in CI against a throwaway remote (or a mock FTP server) to prove the upload path.
+
+## Tickets
+> Permanent log of every change and fix — this repo's ticket system. Rows are append-only: never
+> delete or reword one; only move its Status (open → closed / wont-do) and fill in Ref. Status is
+> a word, not a glyph, so tickets don't count toward the story index. Keep this section last.
+
+| ID | Date | Type | Status | Summary | Ref |
+|---|---|---|---|---|---|
+| DEP-T1 | 2026-10-12 | docs | closed | Start the permanent ticket log in USER_STORIES.md | — |
+| DEP-T2 | 2026-10-13 | fix | closed | Last Updated stamp keeps the page's own line endings (was always CRLF), so a later page rebuild leaves the stamp line alone | test/stamp.test.js |

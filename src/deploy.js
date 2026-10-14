@@ -41,6 +41,7 @@ const fsp           = require('fs/promises');
 const path          = require('path');
 const child_process = require('child_process');
 const ftp           = require('basic-ftp');
+const { stampIndex } = require('./stamp');
 
 const repoRoot     = path.resolve(__dirname, '..');
 const projectsPath = path.join(repoRoot, 'projects.json');
@@ -210,28 +211,6 @@ function expandFiles(sourceDir, patterns) {
     return [...out].sort();
 }
 
-function stampIndex(absFile) {
-    const date  = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-    const stamp = `<!-- Last Updated: ${date} -->`;
-    let content = fs.readFileSync(absFile, 'utf8');
-    // Strip the BOM only so the ^ anchor matches, then restore it on write —
-    // otherwise every deploy silently rewrites a BOM-prefixed file without one.
-    const hadBom = content.charCodeAt(0) === 0xFEFF;
-    if (hadBom) content = content.slice(1);
-    // Each stamp comment is normally followed by a newline; allow end-of-string
-    // too so a file that ends exactly at the comment (no trailing newline) still
-    // matches and gets replaced, instead of accumulating an orphan stamp below
-    // the fresh one on the next deploy.
-    const re = /^(?:﻿?<!--\s*Last Updated:.*?-->(?:\r?\n|$))+/s;
-    if (re.test(content)) {
-        content = content.replace(re, `${stamp}\r\n`);
-    } else {
-        content = `${stamp}\r\n${content}`;
-    }
-    if (hadBom) content = '﻿' + content;
-    fs.writeFileSync(absFile, content, 'utf8');
-    return date;
-}
 
 // The shared package repo comes from projects.json (the first linkedGroups entry with a `package`),
 // never from a hard-coded folder name.
