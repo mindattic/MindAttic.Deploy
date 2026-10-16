@@ -1,7 +1,7 @@
 ---
 codex: 1
 project: MindAttic.Deploy
-code: DEP
+code: M.DPLY
 layer: bible
 status: living
 updated: 2026-10-03
@@ -11,18 +11,18 @@ updated: 2026-10-03
 > Single source of truth for what MindAttic.Deploy IS, is NOT, and the rules that keep it coherent.
 > README.md says how to build/run; this says how to think about the system.
 
-## 1. The one sentence {#DEP-§1}
+## 1. The one sentence {#M.DPLY-§1}
 One pipeline that FTPS-deploys the MindAttic root sites (the MindAttic.Web sites and the `MindAttic.Components` asset package they load, as one linked group) and fires the GitHub-Actions deploys of the Blazor apps — from a single registry (`projects.json`) and a single FTP credential, with zero per-project deploy machinery.
 
-## 2. The product promise {#DEP-§2}
-- **One repo, one install, one credential.** `npm install` once; one FTP credential, resolved per [DEP-LAW-3](#DEP-LAW-3). No per-project `deploy.ps1` / `deploy.settings.json` / `node_modules/`.
-- **One registry edits everything.** [`projects.json`](#DEP-§4) has two target arrays — `sites[]` (verbatim root sites) and `apps[]` (Blazor/CI apps) — plus `linkedGroups`. Add/retag a target by editing only this file.
+## 2. The product promise {#M.DPLY-§2}
+- **One repo, one install, one credential.** `npm install` once; one FTP credential, resolved per [M.DPLY-LAW-3](#M.DPLY-LAW-3). No per-project `deploy.ps1` / `deploy.settings.json` / `node_modules/`.
+- **One registry edits everything.** [`projects.json`](#M.DPLY-§4) has two target arrays — `sites[]` (verbatim root sites) and `apps[]` (Blazor/CI apps) — plus `linkedGroups`. Add/retag a target by editing only this file.
 - **Two pipelines.** Root sites (including the linked group) and apps. A run names one with a mode flag (`--site`, `--sites`, `--uiux`, `--app`, `--apps`); there is no default pipeline.
-- **Two front doors, one engine.** `npm run deploy` (Node) and `MindAttic.Deploy.Cli` (C#) both drive the *same* `src/deploy.js` pipeline — the CLI shells into node. See [DEP-LAW-1](#DEP-LAW-1).
-- **Linked deploy.** The MindAttic.Components repo holds the shared jsDelivr asset package (its `web/` folder); the four sites that load assets from it (`ryandebraal.com`, `mindatticcares.com`, `Hyperspace`, `mindattic.com`) live together in the MindAttic.Web repo; they are a permanent **linked group** (`linkedGroups` in `projects.json`): deploying any one deploys all of them — next tag pinned in the pages, hooks and stamps, one `Pin MindAttic.Components V<n>` commit, tag + push, CDN verified byte-exact, then FTP — and aborts before any upload if a gate fails. The flow is specified in [§4.3](#DEP-§4); the code is `src/linked.js`.
+- **Two front doors, one engine.** `npm run deploy` (Node) and `MindAttic.Deploy.Cli` (C#) both drive the *same* `src/deploy.js` pipeline — the CLI shells into node. See [M.DPLY-LAW-1](#M.DPLY-LAW-1).
+- **Linked deploy.** The MindAttic.Components repo holds the shared jsDelivr asset package (its `web/` folder); the four sites that load assets from it (`ryandebraal.com`, `mindatticcares.com`, `Hyperspace`, `mindattic.com`) live together in the MindAttic.Web repo; they are a permanent **linked group** (`linkedGroups` in `projects.json`): deploying any one deploys all of them — next tag pinned in the pages, hooks and stamps, one `Pin MindAttic.Components V<n>` commit, tag + push, CDN verified byte-exact, then FTP — and aborts before any upload if a gate fails. The flow is specified in [§4.3](#M.DPLY-§4); the code is `src/linked.js`.
 - **Project pages live on GitHub.** Each MindAttic repo's GitHub README is its project page; this repo renders and uploads nothing per project.
 
-## 3. What it is NOT {#DEP-§3}
+## 3. What it is NOT {#M.DPLY-§3}
 - **NOT a component library.** It does not own fonts, the Cyberspace effects, or theme CSS — those live in `MindAttic.Components` and are loaded at runtime via jsDelivr or spliced by its sync scripts. This repo only *invokes* those scripts as `preDeploy` hooks.
 - **NOT a project-page generator.** Each repo's GitHub README is its project page; adding a README renderer here is a regression.
 - **NOT a remote cleaner.** It never deletes files on the FTP host; stale remote files are removed by hand.
@@ -33,7 +33,7 @@ One pipeline that FTPS-deploys the MindAttic root sites (the MindAttic.Web sites
 - **NOT a renderer.** `sites[]` files are uploaded verbatim (only the Last-Updated stamp and the linked group's tag pins are rewritten); nothing is templated.
 - **NOT a committer of anyone's work.** The linked deploy commits only its own pin, splice and stamp changes inside the group's site folders; any other uncommitted change aborts the run, and a hook that touches a file outside those folders aborts it too.
 
-## 4. Architecture canon {#DEP-§4}
+## 4. Architecture canon {#M.DPLY-§4}
 
 ```
                     projects.json  (THE registry)
@@ -59,7 +59,7 @@ One pipeline that FTPS-deploys the MindAttic root sites (the MindAttic.Web sites
 ### 4.1 Projects / components
 - **`MindAttic.Deploy.Cli/`** — C# console app (`net10.0`, Spectre.Console.Cli, assembly name `MindAttic.Deploy`). A thin front door that shells into the node pipeline (see [`Services/DeployRunner.cs`](../MindAttic.Deploy.Cli/Services/DeployRunner.cs) and [`Services/ProjectRoster.cs`](../MindAttic.Deploy.Cli/Services/ProjectRoster.cs)). Solution: [`MindAttic.Deploy.slnx`](../MindAttic.Deploy.slnx).
 - **`src/deploy.js`** — the pipeline (site / app modes; the linked group runs through `src/linked.js`); FTPS via `basic-ftp`; preDeploy hook runner. A run with no mode flag prints usage and exits 2.
-- **`src/linked.js`** — the linked deploy ([§4.3](#DEP-§4)).
+- **`src/linked.js`** — the linked deploy ([§4.3](#M.DPLY-§4)).
 - **`projects.json`** — the registry (`sites[]`/`apps[]` + `linkedGroups`).
 - **`package.json`** — `npm test`, `npm run deploy`, `npm run all` (all sites, then all apps); one runtime dependency, `basic-ftp`.
 - **`.github/workflows/cli-ci.yml`** — builds the C# CLI and smoke-tests `--version`. There is no CI deploy workflow; deploys run from the dev box.
@@ -93,35 +93,35 @@ One pipeline that FTPS-deploys the MindAttic root sites (the MindAttic.Web sites
 - **Credential load** — the C# CLI (`DeployRunner.RunNode`) reads MindAttic.Vault (`FtpCredentialStore.Default.TryGetJson()`, `%APPDATA%\MindAttic\Ftp\ftp.json`) and, when it has content, passes it to node as `MINDATTIC_FTP_JSON`; `loadFtpSettings` in `src/deploy.js` resolves `MINDATTIC_FTP_JSON` env → `secrets/ftp.json`; FTPS via `accessFtp`.
 - **CLI dispatch** (`MindAttic.Deploy.Cli`) — `site` (with `--no-link` / `--with-tests`) / `uiux` (alias `package`) / `app` / `all` / `list` / `version` commands; default (no args) is an interactive multi-select menu (`MainMenuCommand`) that runs a linked group once however many of its members are ticked; all shell into `DeployRunner.RunNode`. `ProjectRoster` resolves the repo root and deserializes `projects.json` at startup.
 
-## 5. The Laws {#DEP-§5}
+## 5. The Laws {#M.DPLY-§5}
 This project **inherits all org-wide laws** from [`MindAttic.HouseRules.md`](../../MindAttic.HouseRules.md) by reference — they are not restated here. Most directly load-bearing for this repo:
 - [HOUSE-LAW-1 — Whole-number versioning](../../MindAttic.HouseRules.md#HOUSE-LAW-1) (assembly `Version` *and* the MindAttic.Web `V<n>` release tag the linked deploy pins).
 - [HOUSE-LAW-2 — Soft-disable, never hard-delete](../../MindAttic.HouseRules.md#HOUSE-LAW-2) (an `apps[]` entry is disabled with a note, never deleted, until infra exists).
-- [HOUSE-LAW-3 — Credentials resolve through MindAttic.Vault](../../MindAttic.HouseRules.md#HOUSE-LAW-3) (FTP creds; see [DEP-LAW-3](#DEP-LAW-3)).
-- [HOUSE-LAW-6 — One engine, many front doors](../../MindAttic.HouseRules.md#HOUSE-LAW-6) (the CLI and `npm run deploy` drive the same `src/deploy.js`; see [DEP-LAW-1](#DEP-LAW-1)).
-- [HOUSE-LAW-8 — Definition of done is verified, not asserted](../../MindAttic.HouseRules.md#HOUSE-LAW-8) (see [§8](#DEP-§8)).
+- [HOUSE-LAW-3 — Credentials resolve through MindAttic.Vault](../../MindAttic.HouseRules.md#HOUSE-LAW-3) (FTP creds; see [M.DPLY-LAW-3](#M.DPLY-LAW-3)).
+- [HOUSE-LAW-6 — One engine, many front doors](../../MindAttic.HouseRules.md#HOUSE-LAW-6) (the CLI and `npm run deploy` drive the same `src/deploy.js`; see [M.DPLY-LAW-1](#M.DPLY-LAW-1)).
+- [HOUSE-LAW-8 — Definition of done is verified, not asserted](../../MindAttic.HouseRules.md#HOUSE-LAW-8) (see [§8](#M.DPLY-§8)).
 
 Project-specific laws:
 
-### DEP-LAW-1 — One pipeline, two front doors {#DEP-LAW-1}
+### M.DPLY-LAW-1 — One pipeline, two front doors {#M.DPLY-LAW-1}
 `src/deploy.js` is the single deploy engine. `MindAttic.Deploy.Cli` MUST NOT reimplement deploy logic; it shells into `node --use-system-ca src/deploy.js …` (`Services/DeployRunner.cs`). A behavior change happens in `src/deploy.js` / `src/linked.js`, not in the C# layer.
 
-### DEP-LAW-2 — The registry is the only edit point for targets {#DEP-LAW-2}
-Adding, removing, or retagging a deploy target (`sites[]` / `apps[]` entries: slug, paths, files, hooks, disabled) and editing linked-group membership or FTP order (`linkedGroups`) is an edit to [`projects.json`](#DEP-§4) and nothing else. Components live in `MindAttic.Components`; project pages are each repo's GitHub README.
+### M.DPLY-LAW-2 — The registry is the only edit point for targets {#M.DPLY-LAW-2}
+Adding, removing, or retagging a deploy target (`sites[]` / `apps[]` entries: slug, paths, files, hooks, disabled) and editing linked-group membership or FTP order (`linkedGroups`) is an edit to [`projects.json`](#M.DPLY-§4) and nothing else. Components live in `MindAttic.Components`; project pages are each repo's GitHub README.
 
-### DEP-LAW-3 — Credentials never live in code or uploaded output {#DEP-LAW-3}
+### M.DPLY-LAW-3 — Credentials never live in code or uploaded output {#M.DPLY-LAW-3}
 FTP credentials resolve MindAttic.Vault (C# CLI only, per [HOUSE-LAW-3](../../MindAttic.HouseRules.md#HOUSE-LAW-3)) → `MINDATTIC_FTP_JSON` env → `secrets/ftp.json` (gitignored), and are never embedded in source or any uploaded file.
 
-### DEP-LAW-4 — Shared assets are CDN-pinned to an immutable tag {#DEP-LAW-4}
+### M.DPLY-LAW-4 — Shared assets are CDN-pinned to an immutable tag {#M.DPLY-LAW-4}
 The sites load shared assets from `MindAttic.Components` on jsDelivr (`gh/mindattic/MindAttic.Components@V<n>/web/`) at an immutable whole-number tag, never `@main` (tip-of-tree, non-atomic, cached ~12h). For the linked group that tag is the release tag the deploy publishes, pins in each site's `pinFiles` and verifies byte-exact on the CDN before any upload; a page never pins a tag newer than the published one.
 
-### DEP-LAW-5 — Apps fire CI; this repo never FTPs an app {#DEP-LAW-5}
+### M.DPLY-LAW-5 — Apps fire CI; this repo never FTPs an app {#M.DPLY-LAW-5}
 For `apps[]`, the repo's contract ends at `git push <branch>`; the project's own workflow performs the real (Azure) deploy. A disabled app prints its `disabledNote` and exits 0 — it never half-fires.
 
-### DEP-LAW-6 — Fail loud on unknown input {#DEP-LAW-6}
+### M.DPLY-LAW-6 — Fail loud on unknown input {#M.DPLY-LAW-6}
 `src/deploy.js` rejects an unknown flag, a linked-only modifier used outside a linked deploy (`--no-link` without `--site`/`--sites`, `--with-tests` without `--site <member>`/`--sites`/`--uiux`) and a run with no mode flag — each with usage and exit 2 — rather than guessing at a deploy.
 
-## 6. Verified state {#DEP-§6}
+## 6. Verified state {#M.DPLY-§6}
 Evidence from the dev box (Windows 11, Node 24, .NET 10 SDK).
 
 | Capability | Status | Evidence |
@@ -133,26 +133,26 @@ Evidence from the dev box (Windows 11, Node 24, .NET 10 SDK).
 | App deploy | 🟡 partial | Push-to-branch CI path; no automated test (it would push real branches). |
 | Automated test suite | 🟡 partial | `test/linked.test.js` covers the linked deploy and the CLI flag guards; plain site/app modes and the C# CLI have no automated tests ([rfc/0001-test-harness.md](rfc/0001-test-harness.md)). |
 
-## 7. Active frontier {#DEP-§7}
+## 7. Active frontier {#M.DPLY-§7}
 - **RFC:** [rfc/0001-test-harness.md](rfc/0001-test-harness.md) — extend automated tests to the plain site/app modes and the C# CLI so those behaviors can graduate from 🟡 to ✅.
-- **Roadmap:** resolve MindAttic.Vault in the Node front door too, so `secrets/ftp.json` can be dropped (DEP-US-E2).
+- **Roadmap:** resolve MindAttic.Vault in the Node front door too, so `secrets/ftp.json` can be dropped (M.DPLY-US-E2).
 - **Epics:** see [USER_STORIES.md](USER_STORIES.md) — Epic A (registry-driven deploy), Epic C (root sites + linked group), Epic D (Blazor apps), Epic E (credentials), and the priority backlog (test harness).
 
-## 8. Quality bar {#DEP-§8}
+## 8. Quality bar {#M.DPLY-§8}
 A change is **done** when:
 1. `dotnet build MindAttic.Deploy.slnx -c Release` is clean (0 warnings — `TreatWarningsAsErrors=true`).
 2. `node src/deploy.js --help` runs, `npm test` passes, and a representative `--dry-run` deploy succeeds for the affected mode.
-3. Behavior changes land in `src/deploy.js` / `src/linked.js` (not duplicated in the C# CLI — [DEP-LAW-1](#DEP-LAW-1)).
-4. Target changes are confined to `projects.json` ([DEP-LAW-2](#DEP-LAW-2)); no credential touches source/output ([DEP-LAW-3](#DEP-LAW-3)).
+3. Behavior changes land in `src/deploy.js` / `src/linked.js` (not duplicated in the C# CLI — [M.DPLY-LAW-1](#M.DPLY-LAW-1)).
+4. Target changes are confined to `projects.json` ([M.DPLY-LAW-2](#M.DPLY-LAW-2)); no credential touches source/output ([M.DPLY-LAW-3](#M.DPLY-LAW-3)).
 5. Per [HOUSE-LAW-8](../../MindAttic.HouseRules.md#HOUSE-LAW-8): a status is `✅` in the docs only when a build or run proves it; otherwise `🟡`/`⬜`.
 6. `powershell -File tools/codex.ps1 doctor` passes.
 
-## 9. Glossary {#DEP-§9}
+## 9. Glossary {#M.DPLY-§9}
 - **Root site** — a verbatim FTPS-uploaded site (`mindattic.com` root, `mindatticcares.com`, `ryandebraal.com`, plus the `hyperspace` and `idiotproof-replays` sub-folders); not templated.
 - **App** — a Blazor / GitHub-Actions deploy target; this repo commits+pushes, CI deploys.
 - **preDeploy hook** — a step run before upload/push: `package-pull`, `powershell`, or `dotnet-build`.
 - **Mode flag** — one of `--site`, `--sites`, `--uiux`, `--app`, `--apps`; `src/deploy.js` exits 2 without one.
 - **Asset manifest** — `MindAttic.Components/web/assets-manifest.json`, the verified list of package assets the CDN gate checks.
-- **Linked group** — see [§4.2](#DEP-§4); **release tag** — the whole-number `V<n>` tag of MindAttic.Components a linked deploy publishes (or reuses) and pins in the sites; **pin** — the `MindAttic.Components@V<n>` segment of a `…/MindAttic.Components@V<n>/web/` jsDelivr URL; **pin commit** — the `Pin MindAttic.Components V<n>` commit holding the pins, splices and stamps that the release tag points at; **CDN gate** — the pre-FTP check that every package asset the sites use is live at the release tag with the exact bytes.
+- **Linked group** — see [§4.2](#M.DPLY-§4); **release tag** — the whole-number `V<n>` tag of MindAttic.Components a linked deploy publishes (or reuses) and pins in the sites; **pin** — the `MindAttic.Components@V<n>` segment of a `…/MindAttic.Components@V<n>/web/` jsDelivr URL; **pin commit** — the `Pin MindAttic.Components V<n>` commit holding the pins, splices and stamps that the release tag points at; **CDN gate** — the pre-FTP check that every package asset the sites use is live at the release tag with the exact bytes.
 - **Front door** — an entry point (the Node `npm run` scripts or the C# CLI) onto the one deploy engine.
 - **Stamp** — the `<!-- Last Updated: <iso> -->` comment written into a root site's `stampFile`.

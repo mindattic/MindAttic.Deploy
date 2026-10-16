@@ -156,7 +156,7 @@ function Build-DigestText {
     if (-not (Test-Path $BiblePath)) { throw "BIBLE.md not found at $BiblePath" }
     $fm   = Get-FrontMatter (Read-TextFile $BiblePath)
     $body = $fm.Body
-    $code = if ($fm.Map.ContainsKey('code')) { $fm.Map['code'] } else { 'DEP' }
+    $code = if ($fm.Map.ContainsKey('code')) { $fm.Map['code'] } else { 'M.DPLY' }
     $proj = if ($fm.Map.ContainsKey('project')) { $fm.Map['project'] } else { 'MindAttic.Deploy' }
 
     $s1 = Get-BibleSection $body '1'
@@ -202,11 +202,11 @@ function Invoke-Digest {
 ---
 codex: 1
 project: MindAttic.Deploy
-code: DEP
+code: M.DPLY
 layer: digest
 status: living
 updated: $today
-generatedFrom: DEP-§1
+generatedFrom: M.DPLY-§1
 ---
 
 "@
@@ -326,7 +326,7 @@ function Test-Doctor {
         $usText = Read-TextFile $usPath
         $doneGlyph = [char]0x2705
         foreach ($line in ($usText -split "`n")) {
-            # Only real story bullets ("- **DEP-US-..."), not legend/blockquote prose.
+            # Only real story bullets ("- **M.DPLY-US-..."), not legend/blockquote prose.
             if ($line -match '^\s*-\s+\*\*' -and $line.Contains($doneGlyph)) {
                 if ($line -notmatch '(verified by|verified via|\btest\b)') {
                     Add-Err "USER_STORIES.md : ✅ story without a test citation: $($line.Trim().Substring(0, [math]::Min(80, $line.Trim().Length)))"

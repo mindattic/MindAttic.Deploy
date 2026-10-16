@@ -1,7 +1,7 @@
 ---
 codex: 1
 project: MindAttic.Deploy
-code: DEP
+code: M.DPLY
 layer: amendments
 status: living
 updated: 2026-10-03
