@@ -18,9 +18,11 @@ public sealed class ProjectRoster
         Config = config;
     }
 
-    public static ProjectRoster Load()
+    public static ProjectRoster Load() => Load(AppContext.BaseDirectory);
+
+    internal static ProjectRoster Load(string startDir)
     {
-        var repoRoot = ResolveRepoRoot();
+        var repoRoot = ResolveRepoRoot(startDir);
         var jsonPath = Path.Combine(repoRoot, "projects.json");
         if (!File.Exists(jsonPath))
             throw new FileNotFoundException($"projects.json not found at {jsonPath}");
@@ -34,16 +36,16 @@ public sealed class ProjectRoster
     }
 
     /// <summary>
-    /// MINDATTIC_DEPLOY_ROOT env var wins. Otherwise walk up from the exe directory
+    /// MINDATTIC_DEPLOY_ROOT env var wins. Otherwise walk up from <paramref name="startDir"/>
     /// looking for projects.json + src/deploy.js.
     /// </summary>
-    private static string ResolveRepoRoot()
+    internal static string ResolveRepoRoot(string startDir)
     {
         var env = Environment.GetEnvironmentVariable("MINDATTIC_DEPLOY_ROOT");
         if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env))
             return Path.GetFullPath(env);
 
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        var dir = new DirectoryInfo(startDir);
         while (dir is not null)
         {
             if (File.Exists(Path.Combine(dir.FullName, "projects.json")) &&
