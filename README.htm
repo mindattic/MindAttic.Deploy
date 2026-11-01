@@ -142,7 +142,7 @@ pre:hover .cpbtn{opacity:1}
 <li>Drive it from a terminal, an interactive menu, CI or another launcher: the Node pipeline and the C# exe run the same engine.</li>
 </ul>
 <h2 id="features">Features</h2>
-<p>MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the <code>mindattic.com</code> root page, <code>mindatticcares.com</code>, <code>ryandebraal.com</code> and the <code>hyperspace</code> sub-folder (these four live in the <a href="https://github.com/mindattic/MindAttic.Web">MindAttic.Web</a> repo, load their shared assets from the <a href="https://github.com/mindattic/MindAttic.Components">MindAttic.Components</a> package, and deploy together with it as one linked group), the <code>idiotproof-replays</code> sub-folder site, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and MindAttic.Ideas enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no <code>deploy.ps1</code>, <code>deploy.bat</code>, <code>deploy.settings.json</code> or <code>node_modules/</code>): everything lives here.</p>
+<p>MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the <code>mindattic.com</code> root page, <code>mindatticcares.com</code>, <code>ryandebraal.com</code> and the <code>hyperspace</code> sub-folder (these four live in the <a href="https://github.com/mindattic/MindAttic.Web">MindAttic.Web</a> repo, load their shared assets from the <a href="https://github.com/mindattic/MindAttic.Components">MindAttic.Components</a> package, and deploy together with it as one linked group), the <code>idiotproof-replays</code> sub-folder site, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and IdeaCms enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no <code>deploy.ps1</code>, <code>deploy.bat</code>, <code>deploy.settings.json</code> or <code>node_modules/</code>): everything lives here.</p>
 <p>Each MindAttic repo's GitHub README is its project page; this repo renders and uploads nothing for individual projects.</p>
 <p>Two front doors drive the exact same engine:</p>
 <ul>
@@ -435,7 +435,7 @@ npm run deploy -- --site mindattic.com --no-link   # ESCAPE HATCH: this site onl
 <p><code>ProjectRoster</code> resolves the repo root by walking up from the exe's directory looking for <code>projects.json</code> plus <code>src/deploy.js</code> (or honors a <code>MINDATTIC_DEPLOY_ROOT</code> env var override), so the exe works when copied anywhere as long as it is still inside (or points at) a MindAttic.Deploy checkout.</p>
 <h3 id="per-project-deploy-shims">Per-project deploy shims</h3>
 <p>Every MindAttic project repo that actually ships something has a thin <code>/deploy</code> slash command (or skill) that shims into this repo. There is exactly one <code>/deploy</code> per such project, and it does one of:</p>
-<pre><code class="language-bash"># App projects (Cursory, PersonaGallery, MindAttic.Ideas, and the disabled ones):
+<pre><code class="language-bash"># App projects (Cursory, PersonaGallery, IdeaCms, and the disabled ones):
 cd D:\Projects\MindAttic\MindAttic.Deploy &amp;&amp; npm run deploy -- --app &lt;slug&gt;
 
 # The linked group (MindAttic.Components + MindAttic.Web's ryandebraal.com, mindatticcares.com, Hyperspace, mindattic.com):

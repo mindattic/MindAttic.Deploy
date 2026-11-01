@@ -38,7 +38,7 @@ Try it: `npm install` then `npm run deploy -- --site mindattic.com --dry-run` fo
 
 ## Features
 
-MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the `mindattic.com` root page, `mindatticcares.com`, `ryandebraal.com` and the `hyperspace` sub-folder (these four live in the [MindAttic.Web](https://github.com/mindattic/MindAttic.Web) repo, load their shared assets from the [MindAttic.Components](https://github.com/mindattic/MindAttic.Components) package, and deploy together with it as one linked group), the `idiotproof-replays` sub-folder site, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and MindAttic.Ideas enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no `deploy.ps1`, `deploy.bat`, `deploy.settings.json` or `node_modules/`): everything lives here.
+MindAttic.Deploy is the single repo that FTPS-deploys (or CI-fires) every MindAttic-owned web property: the `mindattic.com` root page, `mindatticcares.com`, `ryandebraal.com` and the `hyperspace` sub-folder (these four live in the [MindAttic.Web](https://github.com/mindattic/MindAttic.Web) repo, load their shared assets from the [MindAttic.Components](https://github.com/mindattic/MindAttic.Components) package, and deploy together with it as one linked group), the `idiotproof-replays` sub-folder site, and the GitHub-Actions-driven Blazor apps (Cursory, PersonaGallery and IdeaCms enabled; the rest disabled with a note). Projects carry no deploy machinery of their own (no `deploy.ps1`, `deploy.bat`, `deploy.settings.json` or `node_modules/`): everything lives here.
 
 Each MindAttic repo's GitHub README is its project page; this repo renders and uploads nothing for individual projects.
 
@@ -245,7 +245,7 @@ Built from `MindAttic.Deploy.Cli/` (`net10.0`, `AssemblyName=MindAttic.Deploy`, 
 Every MindAttic project repo that actually ships something has a thin `/deploy` slash command (or skill) that shims into this repo. There is exactly one `/deploy` per such project, and it does one of:
 
 ```bash
-# App projects (Cursory, PersonaGallery, MindAttic.Ideas, and the disabled ones):
+# App projects (Cursory, PersonaGallery, IdeaCms, and the disabled ones):
 cd D:\Projects\MindAttic\MindAttic.Deploy && npm run deploy -- --app <slug>
 
 # The linked group (MindAttic.Components + MindAttic.Web's ryandebraal.com, mindatticcares.com, Hyperspace, mindattic.com):

@@ -108,15 +108,15 @@
       ]
     },
     {
-      "slug":          "ideas",
-      "sourceDir":     "../MindAttic.Ideas",
-      "repo":          "mindattic/MindAttic.Ideas",
+      "slug":          "ideacms",
+      "sourceDir":     "../IdeaCms",
+      "repo":          "mindattic/IdeaCms",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
       "disabled":      false,
       "stageOnly":     [],
       "preDeploy": [
-        { "kind": "dotnet-build", "project": "../MindAttic.Ideas/src/MindAttic.Ideas.Blazor/MindAttic.Ideas.Blazor.csproj", "configuration": "Release", "required": true }
+        { "kind": "dotnet-build", "project": "../IdeaCms/src/IdeaCms.Blazor/IdeaCms.Blazor.csproj", "configuration": "Release", "required": true }
       ]
     }
   ],
