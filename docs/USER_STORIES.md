@@ -70,3 +70,4 @@ Dependency-ordered toward the headline goal (every status above provable):
 | M.DPLY-T19 | 2026-10-24 | fix | open | projects.json app 'personagallery' is enabled but its sourceDir ../MindAttic.Legion.PersonaGallery doesn't exist and mindattic/MindAttic.Legion.PersonaGallery isn't a GitHub repo, so every 'npm run deploy -- --apps' (dry run included) ends '[APP FAIL] personagallery: sourceDir not found' and exits non-zero. Point it at the repo's current name/location or disable it with a note; README's 'Cursory, PersonaGallery and MindAttic.Ideas enabled' line needs the same update (found by MAT-T26 sweep) | — |
 | M.DPLY-T20 | 2026-10-24 | docs | closed | Update USER_STORIES.md | — |
 | M.DPLY-T21 | 2026-11-01 | chore | closed | Update deploy project registry: MindAttic.Ideas renamed to IdeaCms | — |
+| M.DPLY-T22 | 2026-11-02 | docs | open | Adopt MindAttic.Agency docs-site pipeline, publish README to GitHub Pages (HOUSE-LAW-14) | — |
