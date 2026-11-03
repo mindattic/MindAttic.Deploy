@@ -556,9 +556,10 @@ function buildCdnChecks({ siteTexts, pkgRoot, spec, tag }) {
             if (u.isPrefix) { prefixes.push({ site: slug, url: u.url }); continue; }
             add(u.path, `${slug} (literal)`);
         }
-        // Everything the manifest lists under this site's domain folder.
+        // Everything the manifest lists under this site's domain folder: `<slug>/...` (the old package layout)
+        // or `assets/<slug>/...` (MindAttic.Components web/, where per-site assets live under assets/).
         for (const f of mfiles.values()) {
-            if (f.path.startsWith(slug + '/')) add(f.path, `${slug} (manifest)`);
+            if (f.path.startsWith(slug + '/') || f.path.startsWith(`assets/${slug}/`)) add(f.path, `${slug} (manifest)`);
         }
     }
 

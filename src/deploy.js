@@ -102,6 +102,11 @@ for (let i = 0; i < argv.length; i++) {
     } else if (a.startsWith('-') && a !== '-') {
         process.stderr.write(`deploy.js: unknown flag ${a}\n\n${USAGE}`);
         process.exit(2);
+    } else {
+        // A stray positional (e.g. `--sites mindattic.com`, meaning `--site mindattic.com`) would otherwise
+        // be ignored and the run would deploy EVERY site.
+        process.stderr.write(`deploy.js: unexpected argument '${a}' (only --site and --app take a value)\n\n${USAGE}`);
+        process.exit(2);
     }
 }
 
@@ -146,6 +151,12 @@ if (noLink && !siteSlug && !allSites) {
 }
 if (withTests && !siteSlug && !allSites && !uiuxMode) {
     process.stderr.write(`deploy.js: --with-tests only applies to a linked deploy (--site <member>, --sites or --uiux).\n`);
+    process.exit(2);
+}
+
+// Site and app modes are separate runs; main() would silently drop the site flags if both were given.
+if ((siteSlug || allSites || uiuxMode) && (appSlug || allApps)) {
+    process.stderr.write(`deploy.js: site flags (--site/--sites/--uiux) and app flags (--app/--apps) cannot be combined; run them separately.\n`);
     process.exit(2);
 }
 
