@@ -29,7 +29,7 @@
  *   --app <slug>           : app mode     -- deploy a single Blazor app (via GitHub Actions)
  *   --apps                 : app mode     -- deploy every ENABLED app (use --include-disabled to surface stubs)
  *   --include-disabled     : app mode     -- include `disabled: true` apps in --apps iteration
- *   --dry-run              : any mode     -- preview without firing: app skips commit/push; site skips stamp+FTP
+ *   --dry-run              : any mode     -- preview without firing: app skips commit/push; site skips hooks+stamp+FTP
  *
  * Credentials live in secrets/ftp.json (or MINDATTIC_FTP_JSON env in CI).
  */
@@ -70,7 +70,7 @@ Flags (also accept --flag=value form):
   --app <slug>         app mode:     deploy a single Blazor app via GitHub Actions
   --apps               app mode:     deploy every enabled app
   --include-disabled   app mode:     include disabled apps in --apps iteration
-  --dry-run            preview without firing (no FTP, no git push)
+  --dry-run            preview without firing (no site hooks, no FTP, no git push)
 
   --help, -h           show this help and exit
 
@@ -314,10 +314,17 @@ async function deployOneSite(client, site, opts = {}) {
 
     process.stdout.write(`\nSite: ${site.slug}  (${sourceDir} -> ${site.ftpRemotePath})${dryRun ? '  [DRY-RUN]' : ''}\n`);
 
-    if (dryRun && !opts.skipHooks && (site.preDeploy || []).length > 0) {
-        process.stdout.write(`  [dry-run] note: preDeploy hooks still RUN (git pull / build / sync scripts may mutate state); only the stamp + FTP upload are skipped.\n`);
+    // A dry-run runs no hook for any site (BIBLE: --dry-run changes nothing): hooks git pull, build and
+    // run sync scripts, so it only lists them. The linked deploy runs its group's hooks itself, earlier.
+    if (!opts.skipHooks) {
+        if (dryRun) {
+            for (const h of site.preDeploy || []) {
+                process.stdout.write(`  [hook] (dry-run) would run ${h.kind}${h.file ? ' ' + h.file : ''}${h.required === false ? ' (optional)' : ''}\n`);
+            }
+        } else {
+            await executePreDeploy(site);
+        }
     }
-    if (!opts.skipHooks) await executePreDeploy(site);   // linked deploy runs the hooks earlier, before its CDN gate
 
     const rawRemote = site.ftpRemotePath || '/';
     const remoteDir = rawRemote === '/' ? '/' : rawRemote.replace(/\/$/, '');

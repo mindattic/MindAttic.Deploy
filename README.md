@@ -97,7 +97,7 @@ Flags (also accept --flag=value form):
   --app <slug>         app mode:     deploy a single Blazor app via GitHub Actions
   --apps               app mode:     deploy every enabled app
   --include-disabled   app mode:     include disabled apps in --apps iteration
-  --dry-run            preview without firing (no FTP, no git push)
+  --dry-run            preview without firing (no site hooks, no FTP, no git push)
 
   --help, -h           show this help and exit
 
@@ -130,7 +130,7 @@ Explicitly out of scope:
 1. Runs the site's `preDeploy[]` hooks (see below).
 2. If `stampFile` is set, rewrites (or inserts) a `<!-- Last Updated: <ISO-8601 UTC> -->` HTML comment at the top of that file. BOM-safe and idempotent: it replaces an existing stamp rather than stacking a new one on top.
 3. Either recursively uploads a whole tree (`uploadDir: true`: non-destructive, only adds and updates, never deletes remote files absent locally; used for the IdiotProof replay archive) or expands the `files[]` glob against `sourceDir` and FTPS-uploads each matched file to `ftpRemotePath`.
-4. `--dry-run` still runs the preDeploy hooks (they can mutate local state: a `git pull`, a PowerShell sync script) but skips the stamp write and the FTP connection.
+4. `--dry-run` runs no preDeploy hook (it lists the hooks it would run), writes no stamp and opens no FTP connection.
 
 ### App mode
 

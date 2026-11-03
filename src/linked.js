@@ -746,7 +746,10 @@ async function runLinked(opts, deps) {
                 log(`\n[4/8] commit  (dry-run) would commit the site changes: "Pin ${pkg.slug} ${tag}"\n`);
                 log(`[5/8] tag     (dry-run) would tag -a ${tag} on that commit\n`);
             } else {
-                // From here until the commit, any failure restores the tree preflight found clean.
+                // From here until the commit, any failure restores the tree preflight found clean. In the split
+                // layout the package repo is restored too, but only when it is clean right now (preflight
+                // verified it), so a reset can never discard changes someone else made there.
+                const pkgCleanBefore = split && porcelainPaths(repoDir).length === 0;
                 try {
                     for (const st of siteState) for (const f of st.files) if (f.changes.length) fs.writeFileSync(f.abs, f.rewritten, 'utf8');
                     for (const site of plan.sites) {
@@ -786,6 +789,15 @@ async function runLinked(opts, deps) {
                     log(`  [git]  restoring the working tree (reset --hard HEAD, clean -fd)\n`);
                     git(sitesWork, ['reset', '--hard', 'HEAD'], { allowFail: true });
                     git(sitesWork, ['clean', '-fd'], { allowFail: true });
+                    if (split) {
+                        if (pkgCleanBefore) {
+                            log(`  [git]  restoring the package repo ${repoDir} (reset --hard HEAD, clean -fd)\n`);
+                            git(repoDir, ['reset', '--hard', 'HEAD'], { allowFail: true });
+                            git(repoDir, ['clean', '-fd'], { allowFail: true });
+                        } else if (porcelainPaths(repoDir).length) {
+                            log(`  [warn] the package repo ${repoDir} was not clean before step 3, so it is left as is; check it by hand.\n`);
+                        }
+                    }
                     throw e;
                 }
                 result.commit = git(sitesWork, ['rev-parse', 'HEAD']).stdout;
