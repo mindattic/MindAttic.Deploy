@@ -71,3 +71,6 @@ Dependency-ordered toward the headline goal (every status above provable):
 | M.DPLY-T20 | 2026-10-24 | docs | closed | Update USER_STORIES.md | — |
 | M.DPLY-T21 | 2026-11-01 | chore | closed | Update deploy project registry: MindAttic.Ideas renamed to IdeaCms | — |
 | M.DPLY-T22 | 2026-11-02 | docs | open | Adopt MindAttic.Agency docs-site pipeline, publish README to GitHub Pages (HOUSE-LAW-14) | — |
+| M.DPLY-T23 | 2026-11-02 | fix | closed | Bughunt sweep, two passes: find and fix real bugs across tracked source (user request 2026-11-02) | — |
+| M.DPLY-T24 | 2026-11-02 | fix | closed | Fix the open items the 2026-11-02 bughunt left for decision (failed step 3/4 resets a clean package repo, dry-run runs no hooks) | — |
+| M.DPLY-T25 | 2026-11-10 | chore | closed | Crash recovery: commit the command-catalog sync (.agent/commands/*.md) and regenerated docs/USER_STORIES.md left uncommitted by the session crash | — |
