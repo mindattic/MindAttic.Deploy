@@ -37,8 +37,7 @@
       "repo":          "mindattic/TaxRateCollector",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
-      "disabled":      true,
-      "disabledNote":  "Workflow targets `taxratecollector` App Service. Needs Azure infrastructure + AZURE_WEBAPP_PUBLISH_PROFILE secret in mindattic/TaxRateCollector. Set `disabled: false` once those exist.",
+      "disabled":      false,
       "stageOnly":     [],
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../TaxRateCollector/TaxRateCollector.Blazor/TaxRateCollector.Blazor.csproj", "configuration": "Release", "required": true }
@@ -63,8 +62,7 @@
       "repo":          "mindattic/Tutor",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
-      "disabled":      true,
-      "disabledNote":  "No workflow yet. Add .github/workflows/azure-deploy.yml (mirror Prose's pattern), provision an Azure App Service, add AZURE_WEBAPP_PUBLISH_PROFILE secret, then set `disabled: false`.",
+      "disabled":      false,
       "stageOnly":     [],
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../Tutor/Tutor.Blazor/Tutor.Blazor.csproj", "configuration": "Release", "required": true }
