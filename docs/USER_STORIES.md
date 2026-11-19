@@ -74,3 +74,6 @@ Dependency-ordered toward the headline goal (every status above provable):
 | M.DPLY-T23 | 2026-11-02 | fix | closed | Bughunt sweep, two passes: find and fix real bugs across tracked source (user request 2026-11-02) | — |
 | M.DPLY-T24 | 2026-11-02 | fix | closed | Fix the open items the 2026-11-02 bughunt left for decision (failed step 3/4 resets a clean package repo, dry-run runs no hooks) | — |
 | M.DPLY-T25 | 2026-11-10 | chore | closed | Crash recovery: commit the command-catalog sync (.agent/commands/*.md) and regenerated docs/USER_STORIES.md left uncommitted by the session crash | — |
+| M.DPLY-T26 | 2026-11-17 | chore | open | Enable TaxRateCollector and Tutor in projects.json now that both deploy to Azure App Service | — |
+| M.DPLY-T27 | 2026-11-17 | chore | closed | Re-enable the prose app entry in projects.json: Prose.Hub hosted mode deploys to mindattic-prose through Prose's azure-deploy.yml (PRS-T1005) | — |
+| M.DPLY-T28 | 2026-11-18 | docs | closed | Update USER_STORIES.md | — |
