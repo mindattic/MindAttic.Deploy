@@ -46,8 +46,8 @@
       "repo":          "mindattic/ThinkTank",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
-      "disabled":      true,
-      "disabledNote":  "No workflow yet. Add .github/workflows/azure-deploy.yml (mirror Prose's pattern), provision an Azure App Service, add AZURE_WEBAPP_PUBLISH_PROFILE secret, then set `disabled: false`.",
+      "$comment":      "Enabled 2026-11-19 (TT-T48 / M.DPLY-T29): ThinkTank's .github/workflows/azure-deploy.yml deploys ThinkTank.Blazor to the Windows App Service `mindattic-thinktank` (plan ASP-MyApps-99fe) with GitHub OIDC (app registration `gh-mindattic-webapps-deploy`), then smoke-tests /healthz, /healthz/db, /login and that signed-out requests are refused. Pushes that touch only docs, tests or Markdown deploy nothing (dispatch the workflow by hand then).",
+      "disabled":      false,
       "stageOnly":     [],
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../ThinkTank/ThinkTank.Blazor/ThinkTank.Blazor.csproj", "configuration": "Release", "required": true }
