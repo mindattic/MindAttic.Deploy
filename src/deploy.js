@@ -291,6 +291,8 @@ async function executePreDeploy(profile, opts = {}) {
             } else if (hook.kind === 'powershell') {
                 const hookArgs = [...(hook.args || [])];
                 if (opts.tag && hook.tagArg) hookArgs.push(hook.tagArg, opts.tag);
+                // A hook that ships something (Gadfly's deploy-azure.ps1) declares the flag that makes it a rehearsal.
+                if (dryRun && hook.dryRunArg) hookArgs.push(hook.dryRunArg);
                 const code = runPowershellHook(hook.file, hookArgs);
                 if (code !== 0) throw new Error(`hook exited ${code}`);
             } else if (hook.kind === 'dotnet-build') {

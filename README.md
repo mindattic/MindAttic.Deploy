@@ -112,7 +112,7 @@ Everything that ships via FTP or via a `git push` that fires a GitHub Actions wo
 |---|---|---|---|
 | `sites[]` | Verbatim root/sub-site upload, not templated | FTPS upload of a `files[]` glob (or a whole directory tree via `uploadDir`) to `ftpRemotePath` | mindattic.com (root), mindatticcares.com, ryandebraal.com, hyperspace, idiotproof-replays |
 | `linkedGroups` | Sites that are inseparable from a shared package (in its repo, or all in one other repo) | The linked flow ([Linked deploy](#linked-deploy)): pin, hooks, stamp, commit, tag, push, CDN gate, then FTP of every member site | `mindattic-web` = MindAttic.Components (package folder `web`) + ryandebraal.com + mindatticcares.com + hyperspace + mindattic.com |
-| `apps[]` | Blazor / GitHub-Actions-driven deploy | `git commit` (of `stageOnly` paths) + `git push <branch>`, which fires the project's own `.github/workflows/<workflow>` (the real Azure push happens there, not here) | cursory, personagallery, ideas (enabled); prose (local-only), idiotproof, taxratecollector, thinktank, tutor, mindatticfrontend (disabled, each with a `disabledNote` explaining exactly why) |
+| `apps[]` | Blazor / GitHub-Actions-driven deploy | `git commit` (of `stageOnly` paths) + `git push <branch>`, which fires the project's own `.github/workflows/<workflow>` (the real Azure push happens there, not here) | cursory, personagallery, ideas, gadfly (enabled; gadfly's deploy is its `tools/deploy-azure.ps1` run as the preDeploy hook: migrations first, then zip deploy and health/login smoke checks); prose (local-only), idiotproof, taxratecollector, thinktank, tutor, mindatticfrontend (disabled, each with a `disabledNote` explaining exactly why) |
 
 Explicitly out of scope:
 
@@ -148,7 +148,7 @@ Explicitly out of scope:
 | Kind | What it does | Notes |
 |---|---|---|
 | `package-pull` | `git -C <linked package sourceDir> pull --no-edit --no-rebase` (today `../MindAttic.Web`) | The folder comes from `linkedGroups` in `projects.json`. Fails loudly if it is not a git repo. Skipped inside the linked flow (its preflight already verified the repo). |
-| `powershell` | `powershell -NoProfile -ExecutionPolicy Bypass -File <file> [args...]` | `file` is resolved relative to the repo root; relative-looking `args` are resolved too. In the linked flow a hook with `tagArg` also receives the release tag. |
+| `powershell` | `powershell -NoProfile -ExecutionPolicy Bypass -File <file> [args...]` | `file` is resolved relative to the repo root; relative-looking `args` are resolved too. In the linked flow a hook with `tagArg` also receives the release tag. A hook with `dryRunArg` (e.g. `"-DryRun"`) receives that flag under `--dry-run`; use it for a hook that deploys by itself, because app-mode hooks otherwise run even in a dry run. |
 | `dotnet-build` | `dotnet build <project> -c <configuration> --nologo` | `configuration` defaults to `Release`. |
 
 Every hook entry can set `"required": false` to make a failure non-fatal (it logs and continues instead of aborting the whole deploy).

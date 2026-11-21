@@ -113,6 +113,19 @@
       "preDeploy": [
         { "kind": "dotnet-build", "project": "../IdeaCms/src/IdeaCms.Blazor/IdeaCms.Blazor.csproj", "configuration": "Release", "required": true }
       ]
+    },
+    {
+      "slug":          "gadfly",
+      "sourceDir":     "../Gadfly",
+      "repo":          "mindattic/Gadfly",
+      "branch":        "main",
+      "workflow":      "azure-deploy.yml",
+      "$comment":      "GAD-T222 / M.DPLY-T30. Gadfly deploys to App Service mindattic-gadfly from Gadfly's own tools/deploy-azure.ps1, run here as the preDeploy hook: clean git-archive export of HEAD, EF migrations against Azure SQL first (a failure stops the deploy), publish, zip deploy, then /healthz and /login must answer 200. The hook is the deploy; the push after it only publishes HEAD to origin (the workflow is manual). --dry-run passes -DryRun (export, restore, migration list, publish, zip; nothing is migrated or deployed).",
+      "disabled":      false,
+      "stageOnly":     [],
+      "preDeploy": [
+        { "kind": "powershell", "file": "../Gadfly/tools/deploy-azure.ps1", "dryRunArg": "-DryRun", "required": true }
+      ]
     }
   ],
 

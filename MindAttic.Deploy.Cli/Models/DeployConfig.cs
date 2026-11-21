@@ -34,6 +34,8 @@ public sealed class HookProfile
     [JsonPropertyName("required")]      public bool?   Required      { get; set; }
     /// <summary>Linked deploy: the powershell flag that receives the release tag (e.g. -Tag).</summary>
     [JsonPropertyName("tagArg")]        public string? TagArg        { get; set; }
+    /// <summary>The powershell flag appended under --dry-run (e.g. -DryRun), for a hook that deploys by itself.</summary>
+    [JsonPropertyName("dryRunArg")]     public string? DryRunArg     { get; set; }
 }
 
 /// <summary>
