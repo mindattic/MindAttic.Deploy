@@ -74,6 +74,13 @@ Dependency-ordered toward the headline goal (every status above provable):
 | M.DPLY-T23 | 2026-11-02 | fix | closed | Bughunt sweep, two passes: find and fix real bugs across tracked source (user request 2026-11-02) | — |
 | M.DPLY-T24 | 2026-11-02 | fix | closed | Fix the open items the 2026-11-02 bughunt left for decision (failed step 3/4 resets a clean package repo, dry-run runs no hooks) | — |
 | M.DPLY-T25 | 2026-11-10 | chore | closed | Crash recovery: commit the command-catalog sync (.agent/commands/*.md) and regenerated docs/USER_STORIES.md left uncommitted by the session crash | — |
-| M.DPLY-T26 | 2026-11-17 | chore | open | Enable TaxRateCollector and Tutor in projects.json now that both deploy to Azure App Service | — |
+| M.DPLY-T26 | 2026-11-17 | chore | closed | Enable TaxRateCollector and Tutor in projects.json now that both deploy to Azure App Service | — |
 | M.DPLY-T27 | 2026-11-17 | chore | closed | Re-enable the prose app entry in projects.json: Prose.Hub hosted mode deploys to mindattic-prose through Prose's azure-deploy.yml (PRS-T1005) | — |
 | M.DPLY-T28 | 2026-11-18 | docs | closed | Update USER_STORIES.md | — |
+| M.DPLY-T29 | 2026-11-19 | chore | closed | Enable the thinktank app entry: ThinkTank now has .github/workflows/azure-deploy.yml deploying to App Service mindattic-thinktank with GitHub OIDC (TT-T48) | TT-T48 |
+| M.DPLY-T30 | 2026-11-21 | feature | closed | Add a gadfly app entry that runs Gadfly's tools/deploy-azure.ps1 as a preDeploy hook, and a per-hook dryRunArg so --dry-run does not run a real deploy (GAD-T222) | 6229c07 |
+| M.DPLY-T31 | 2026-11-22 | chore | open | Extract DeployRunner's node arg list builder (or injectable process starter) so RunSite/RunApp/RunUiux are testable without spawning node. | — |
+| M.DPLY-T32 | 2026-11-22 | chore | open | NUnit tests for DeployRunner arg building (flags, --use-system-ca first, ArgumentException), MINDATTIC_FTP_JSON env handling, node-missing returns 127, [ in Markup output. | — |
+| M.DPLY-T33 | 2026-11-22 | chore | open | Extract MainMenuCommand/AllCommand plan-building into a testable method behind an injectable runner. | — |
+| M.DPLY-T34 | 2026-11-22 | chore | open | NUnit tests for MainMenuCommand/AllCommand batching rules, group dedupe, Batches count, LabelFor, exit-code handling and empty-section skipping. | — |
+| M.DPLY-T35 | 2026-11-22 | docs | closed | 2026-11-22 morning | — |
