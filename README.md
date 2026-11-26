@@ -71,7 +71,7 @@ npm run all                              # sites + apps, back-to-back
 
 A mode flag is required. `npm run deploy` with none of `--site`, `--sites`, `--uiux`, `--app` or `--apps` prints usage and exits 2 ("no mode given"); there is no default pipeline.
 
-Or with the C# CLI (build it once with `dotnet build`, or use the published `artifacts\MindAttic.Deploy.exe`):
+Or with the C# CLI (build it once with `dotnet build`, or use the installed `R:\MindAttic\Apps\MindAttic.Deploy\Release\MindAttic.Deploy.exe` that `run.ps1 -Redeploy` puts there):
 
 ```powershell
 dotnet run --project MindAttic.Deploy.Cli   # interactive multi-select menu
@@ -328,7 +328,7 @@ lib/local-packages/                vendored MindAttic.Vault .nupkg, git-tracked 
 scripts/
   publish.ps1                     dotnet publish -> artifacts\MindAttic.Deploy.exe (single-file, win-x64)
   ensure-fresh.ps1                 republishes only if sources changed newer than the exe
-run.bat                            convenience launcher: ensure-fresh.ps1 then exec the published exe
+run.ps1, run.bat                   the shared run menu (1 Redeploy to R:\MindAttic\Apps\MindAttic.Deploy, 2 Run Debug, 3 Run Release)
 tools/
   codex.ps1                        Codex doctor + digest generator for docs/
   build-readme.ps1                 regenerates README.htm from this file (shared engine)
@@ -353,10 +353,10 @@ node src/deploy.js --help
 # Publish the CLI as a single-file win-x64 exe -> artifacts\MindAttic.Deploy.exe
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1
 
-# run.bat: republishes only if
-# sources changed since the last build (scripts\ensure-fresh.ps1), then execs
-# the published exe with whatever args were passed.
-run.bat --version
+# run.bat / run.ps1: the shared run menu. -Redeploy builds Debug and Release into
+# R:\MindAttic\Apps\MindAttic.Deploy; -RunDebug passes the rest of its args to the exe.
+.\run.ps1 -Redeploy
+.\run.ps1 -RunDebug --version
 ```
 
 `npm test` runs `test/linked.test.js` (node:test): the linked deploy against a throwaway monorepo (a `Shared/` package folder plus site folders) with a bare origin, a local HTTP stand-in for jsDelivr that serves the published tag, and a fake FTP client, plus the CLI flag guards (unknown flags, linked-only modifiers, no mode flag) and registry consistency. Plain site and app modes and the C# CLI have no automated tests (`dotnet test` has nothing to run); they are proven by a clean build plus ad-hoc `--dry-run` invocations. See [docs/rfc/0001-test-harness.md](docs/rfc/0001-test-harness.md) for the plan to close that gap and [the user stories](docs/USER_STORIES.md) for which stories are blocked on it.
