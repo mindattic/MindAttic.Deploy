@@ -16,8 +16,8 @@ public sealed class VersionCommand : Command
         // exe actually lives whether you launched it via `dotnet run`, the
         // unpacked dll, or the published artifacts\MindAttic.Deploy.exe.
         var location = Environment.ProcessPath ?? AppContext.BaseDirectory;
-        AnsiConsole.MarkupLine($"[bold]{name}[/] [grey]{version}[/]");
-        AnsiConsole.MarkupLine($"[grey]{location}[/]");
+        AnsiConsole.MarkupLine($"[bold]{Markup.Escape(name)}[/] [grey]{Markup.Escape(version)}[/]");
+        AnsiConsole.MarkupLine($"[grey]{Markup.Escape(location)}[/]");
         return 0;
     }
 }

@@ -17,7 +17,7 @@ public sealed class MainMenuCommand : Command
         var runner = new DeployRunner(roster.RepoRoot);
 
         AnsiConsole.Write(new Rule("[cyan1]MindAttic.Deploy[/]").LeftJustified());
-        AnsiConsole.MarkupLine($"[grey]repo: {roster.RepoRoot}[/]");
+        AnsiConsole.MarkupLine($"[grey]repo: {Markup.Escape(roster.RepoRoot)}[/]");
         AnsiConsole.WriteLine();
 
         var prompt = new MultiSelectionPrompt<string>()
@@ -135,14 +135,14 @@ public sealed class MainMenuCommand : Command
         {
             var slug = key[SitePrefix.Length..];
             var s = cfg.Sites.FirstOrDefault(x => x.Slug == slug);
-            return $"{slug} [grey]-> {s?.FtpRemotePath}[/]";
+            return $"{Markup.Escape(slug)} [grey]-> {Markup.Escape(s?.FtpRemotePath ?? "")}[/]";
         }
         if (key.StartsWith(AppPrefix))
         {
             var slug = key[AppPrefix.Length..];
             var a = cfg.Apps.FirstOrDefault(x => x.Slug == slug);
             var status = a?.Disabled == true ? " [red](disabled)[/]" : "";
-            return $"{slug} [grey]-> {a?.Repo}@{a?.Branch}[/]{status}";
+            return $"{Markup.Escape(slug)} [grey]-> {Markup.Escape(a?.Repo ?? "")}@{Markup.Escape(a?.Branch ?? "")}[/]{status}";
         }
         return key;
     };

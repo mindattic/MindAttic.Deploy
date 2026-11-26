@@ -27,7 +27,7 @@ public sealed class AllCommand : Command<AllCommand.Settings>
         var runner = new DeployRunner(roster.RepoRoot);
 
         AnsiConsole.Write(new Rule("[cyan1]MindAttic.Deploy — all[/]").LeftJustified());
-        AnsiConsole.MarkupLine($"[grey]repo: {roster.RepoRoot}[/]");
+        AnsiConsole.MarkupLine($"[grey]repo: {Markup.Escape(roster.RepoRoot)}[/]");
         var totals = $"{roster.Config.Sites.Count} site(s) + {roster.Config.Apps.Count} app(s)";
         AnsiConsole.MarkupLine($"[grey]targets: {totals}[/]");
         if (settings.DryRun)

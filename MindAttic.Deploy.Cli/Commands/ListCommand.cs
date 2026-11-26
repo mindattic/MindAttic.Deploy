@@ -12,7 +12,7 @@ public sealed class ListCommand : Command
         var roster = ProjectRoster.Load();
         var cfg = roster.Config;
 
-        AnsiConsole.MarkupLine($"[grey]repo: {roster.RepoRoot}[/]");
+        AnsiConsole.MarkupLine($"[grey]repo: {Markup.Escape(roster.RepoRoot)}[/]");
 
         if (cfg.Sites.Count > 0)
         {
