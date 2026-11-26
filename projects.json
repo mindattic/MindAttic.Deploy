@@ -191,6 +191,16 @@
       "sourceDir":     "../MindAttic.Web/mindattic.com/idiotproof",
       "ftpRemotePath": "/mindattic.com/idiotproof",
       "uploadDir":     true
+    },
+    {
+      "slug":          "knowyourmech",
+      "sourceDir":     "../KnowYourMech/dist/site",
+      "ftpRemotePath": "/mindattic.com/knowyourmech",
+      "uploadDir":     true,
+      "$comment":      "Standalone static site (not in the mindattic-web linked group). The build hook writes dist/site/ from mechs.json/pool.json before the recursive upload (KYM-T11 / M.DPLY-T37).",
+      "preDeploy": [
+        { "kind": "powershell", "file": "../KnowYourMech/tools/build-site.ps1", "required": true }
+      ]
     }
   ]
 }

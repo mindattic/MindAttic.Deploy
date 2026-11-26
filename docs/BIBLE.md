@@ -148,7 +148,7 @@ A change is **done** when:
 6. `powershell -File tools/codex.ps1 doctor` passes.
 
 ## 9. Glossary {#M.DPLY-§9}
-- **Root site** — a verbatim FTPS-uploaded site (`mindattic.com` root, `mindatticcares.com`, `ryandebraal.com`, plus the `hyperspace` and `idiotproof-replays` sub-folders); not templated.
+- **Root site** — a verbatim FTPS-uploaded site (`mindattic.com` root, `mindatticcares.com`, `ryandebraal.com`, plus the `hyperspace`, `idiotproof-replays` and `knowyourmech` sub-folders); not templated.
 - **App** — a Blazor / GitHub-Actions deploy target; this repo commits+pushes, CI deploys.
 - **preDeploy hook** — a step run before upload/push: `package-pull`, `powershell`, or `dotnet-build`.
 - **Mode flag** — one of `--site`, `--sites`, `--uiux`, `--app`, `--apps`; `src/deploy.js` exits 2 without one.

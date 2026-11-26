@@ -84,3 +84,5 @@ Dependency-ordered toward the headline goal (every status above provable):
 | M.DPLY-T33 | 2026-11-22 | chore | open | Extract MainMenuCommand/AllCommand plan-building into a testable method behind an injectable runner. | — |
 | M.DPLY-T34 | 2026-11-22 | chore | open | NUnit tests for MainMenuCommand/AllCommand batching rules, group dedupe, Batches count, LabelFor, exit-code handling and empty-section skipping. | — |
 | M.DPLY-T35 | 2026-11-22 | docs | closed | 2026-11-22 morning | — |
+| M.DPLY-T36 | 2026-11-24 | fix | open | Hunt the whole repo for real bugs with no time limit and fix every confirmed one | — |
+| M.DPLY-T37 | 2026-11-25 | feature | closed | Register knowyourmech site (built dist/site, FTP to /mindattic.com/knowyourmech) in projects.json | M.DPLY-T37 |
