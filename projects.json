@@ -120,12 +120,11 @@
       "repo":          "mindattic/Gadfly",
       "branch":        "main",
       "workflow":      "azure-deploy.yml",
-      "$comment":      "GAD-T222 / M.DPLY-T30. Gadfly deploys to App Service mindattic-gadfly from Gadfly's own tools/deploy-azure.ps1, run here as the preDeploy hook: clean git-archive export of HEAD, EF migrations against Azure SQL first (a failure stops the deploy), publish, zip deploy, then /healthz and /login must answer 200. The hook is the deploy; the push after it only publishes HEAD to origin (the workflow is manual). --dry-run passes -DryRun (export, restore, migration list, publish, zip; nothing is migrated or deployed).",
-      "disabled":      false,
+      "$comment":      "GAD-T222 / M.DPLY-T30. Gadfly deployed to App Service mindattic-gadfly via Gadfly's own tools/deploy-azure.ps1, run here as the preDeploy hook. GAD-T804 removed that script (and the azure-deploy.yml workflow) in the Azure decommission (MAT-T297); re-add a preDeploy hook here once Gadfly has a non-Azure deploy mechanism.",
+      "disabled":      true,
+      "disabledNote":  "tools/deploy-azure.ps1 and azure-deploy.yml were removed by GAD-T804's Azure decommission (MAT-T297); Gadfly has no deploy mechanism until a replacement is built. Set disabled:false once one exists.",
       "stageOnly":     [],
-      "preDeploy": [
-        { "kind": "powershell", "file": "../Gadfly/tools/deploy-azure.ps1", "dryRunArg": "-DryRun", "required": true }
-      ]
+      "preDeploy": []
     }
   ],
 
